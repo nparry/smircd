@@ -20,8 +20,8 @@ class CommandSpec extends Specification {
     }
 
     "handleNickCmd" in {
-      cmd[NickCommand]("NICK Foo").nickname mustEqual "Foo"
-      cmd[NickCommand]("NICK Foo ignored").nickname mustEqual "Foo"
+      cmd[NickCommand]("NICK Foo").nickname mustEqual NickName("Foo")
+      cmd[NickCommand]("NICK Foo ignored").nickname mustEqual NickName("Foo")
     }
 
     "rejectInvalidNickCmd" in {
@@ -130,7 +130,7 @@ class CommandSpec extends Specification {
 
     "handleKickCmd" in {
       cmd[KickCommand]("KICK #blah someone").channel.name mustEqual "#blah"
-      cmd[KickCommand]("KICK #blah someone").user mustEqual "someone"
+      cmd[KickCommand]("KICK #blah someone").user mustEqual NickName("someone")
       cmd[KickCommand]("KICK #blah someone").message mustEqual None
       cmd[KickCommand]("KICK #blah someone :bye bye").message mustEqual Some("bye bye")
     }
@@ -145,13 +145,13 @@ class CommandSpec extends Specification {
       cmd[PrivMsgCommand]("PRIVMSG foo :hi there").message mustEqual "hi there"
       cmd[PrivMsgCommand]("PRIVMSG foo hi there").message mustEqual "hi"
 
-      cmd[PrivMsgCommand]("PRIVMSG foo :hi there").nicknames mustEqual List("foo")
+      cmd[PrivMsgCommand]("PRIVMSG foo :hi there").nicknames mustEqual List(NickName("foo"))
       cmd[PrivMsgCommand]("PRIVMSG foo :hi there").channels mustEqual List()
 
       cmd[PrivMsgCommand]("PRIVMSG #foo :hi there").nicknames mustEqual List()
       cmd[PrivMsgCommand]("PRIVMSG #foo :hi there").channels mustEqual List(ChannelName("#foo"))
 
-      cmd[PrivMsgCommand]("PRIVMSG #foo,bar :hi there").nicknames mustEqual List("bar")
+      cmd[PrivMsgCommand]("PRIVMSG #foo,bar :hi there").nicknames mustEqual List(NickName("bar"))
       cmd[PrivMsgCommand]("PRIVMSG #foo,bar :hi there").channels mustEqual List(ChannelName("#foo"))
     }
 
@@ -161,7 +161,7 @@ class CommandSpec extends Specification {
     }
 
     "handleNoticeCmd" in {
-      cmd[NoticeCommand]("NOTICE me blah").nickname mustEqual "me"
+      cmd[NoticeCommand]("NOTICE me blah").nickname mustEqual NickName("me")
       cmd[NoticeCommand]("NOTICE me blah").message mustEqual "blah"
     }
 
@@ -171,7 +171,7 @@ class CommandSpec extends Specification {
     }
 
     "handleKillCmd" in {
-      cmd[KillCommand]("KILL me blah").nickname mustEqual "me"
+      cmd[KillCommand]("KILL me blah").nickname mustEqual NickName("me")
       cmd[KillCommand]("KILL me blah").comment mustEqual "blah"
     }
 

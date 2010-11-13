@@ -2,13 +2,33 @@ package com.nparry.smircd.protocol
 
 object Command {
 
+  object SupportedCommand {
+    def apply(prefix: String, command: String, params: Iterable[String]): SupportedCommand =
+      apply(Some(prefix), command, params)
+    
+
+    def apply(prefix: Option[String], command: String, params: Iterable[String]): SupportedCommand =
+      new SupportedCommand(ParsedCommand(prefix, command, params.toList))
+  }
+
   class SupportedCommand(cmd: ParsedCommand) extends Command(cmd.raw) {
+
+    def copyWithNewPrefix(prefix: Option[String]): SupportedCommand = {
+      new SupportedCommand(cmd.copy(prefix=prefix))
+    }
+
+    def copyWithNewParams(newParams: List[String]): SupportedCommand = {
+      new SupportedCommand(cmd.copy(params=newParams))
+    }
+
     protected def p(i: Int) = cmd.params(i)
     protected def maybeP(i: Int) = if (i < cmd.params.size) Some(p(i)) else None
 
     protected def chanP(i: Int) = ChannelName.single(p(i), handleBadChannel).right.get
     protected def chanListP(i: Int) = ChannelName.list(p(i), handleBadChannel).right.get
     protected def maybeChanListP(i: Int) = maybeP(i).map(ChannelName.list(_, handleBadChannel).right.get)
+
+    protected def nickP(i: Int) = NickName.single(p(i), handleBadNick).right.get
 
     protected def minimumParams(i: Int, rspCode: ResponseCode.Value = ResponseCode.ERR_NEEDMOREPARAMS) = {
       if (cmd.params.size < i)
@@ -76,7 +96,9 @@ object Command {
 
   case class NickCommand(cmd: ParsedCommand) extends SupportedCommand(cmd) {
     minimumParams(1, ResponseCode.ERR_NONICKNAMEGIVEN)
-    def nickname = p(0)
+    val nick = nickP(0)
+
+    def nickname = nick
   }
 
   case class UserCommand(cmd: ParsedCommand) extends SupportedCommand(cmd) {
@@ -123,8 +145,7 @@ object Command {
     def channels = maybeP(0)
       .map(s => ChannelName.listOfValid(s, { x => x }))
       .getOrElse(List())
-      .filter { _.isRight }
-      .map { _.right.get }
+      .flatMap(_.right.toOption)
   }
 
   case class ListCommand(cmd: ParsedCommand) extends SupportedCommand(cmd) {
@@ -136,32 +157,37 @@ object Command {
   case class KickCommand(cmd: ParsedCommand) extends SupportedCommand(cmd) {
     minimumParams(2)
     val chan = chanP(0)
+    val usr = nickP(1)
 
     def channel = chan
-    def user = p(1)
+    def user = usr
     def message = maybeP(2)
   }
 
   case class PrivMsgCommand(cmd: ParsedCommand) extends SupportedCommand(cmd) {
     minimumParams(2)
-    val receivers = ChannelName.listOfValid(p(0), { x => x }).partition { _.isLeft }
+    val receivers = ChannelName.listOfValid(
+      p(0),
+      { x => NickName.single(x, handleBadNick).right.get })
 
-    def nicknames = receivers._1.map(_.left.get)
-    def channels = receivers._2.map(_.right.get)
+    def nicknames = receivers.flatMap(_.left.toOption)
+    def channels = receivers.flatMap(_.right.toOption)
     def message = p(1)
   }
 
   case class NoticeCommand(cmd: ParsedCommand) extends SupportedCommand(cmd) {
     minimumParams(2)
+    val nick = nickP(0)
 
-    def nickname = p(0)
+    def nickname = nick
     def message = p(1)
   }
 
   case class KillCommand(cmd: ParsedCommand) extends SupportedCommand(cmd) {
     minimumParams(2)
+    val nick = nickP(0)
 
-    def nickname = p(0)
+    def nickname = nick
     def comment = p(1)
   }
 
@@ -315,6 +341,10 @@ object Command {
 
   private val handleBadChannel = { e: IllegalArgumentException =>
     throw new InvalidCommandException("Bad channel name " + e.getMessage(), ResponseCode.ERR_NOSUCHCHANNEL)
+  }
+
+  private val handleBadNick = { e: IllegalArgumentException =>
+    throw new InvalidCommandException("Bad nickname " + e.getMessage(), ResponseCode.ERR_ERRONEUSNICKNAME)
   }
 }
 
