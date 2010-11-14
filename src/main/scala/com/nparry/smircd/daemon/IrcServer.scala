@@ -10,7 +10,12 @@ import scala.collection.mutable.{Map => MMap}
 import com.nparry.smircd.protocol._
 import com.nparry.smircd.protocol.Command._
 
-class IrcServer(serverId: String) extends Actor {
+object IrcServer {
+  case class OutboundMessage(cmd: SupportedCommand)
+  case class Shutdown()
+}
+
+class IrcServer(val serverId: String) extends Actor {
 
   val pendingConnections = MMap[Actor, User.Pending]()
   val activeConnections = MMap[Actor, User.Registered]()
@@ -88,6 +93,17 @@ class IrcServer(serverId: String) extends Actor {
   def act() {
     loop {
       react {
+        case IrcServer.Shutdown() => {
+          for (u <- pendingConnections.values) {
+            deleteUser(u)
+          }
+          for (u <- activeConnections.values) {
+            deleteUser(u)
+          }
+
+          exit()
+        }
+
         case (a: Actor, joining: Boolean) => {
           if (joining)
             updateConnection(User.Pending(a, serverId))

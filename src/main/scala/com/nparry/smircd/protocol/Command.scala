@@ -13,6 +13,8 @@ object Command {
 
   class SupportedCommand(cmd: ParsedCommand) extends Command(cmd.raw) {
 
+    override def toString = cmd.raw
+
     def copyWithNewPrefix(prefix: Option[String]): SupportedCommand = {
       new SupportedCommand(cmd.copy(prefix=prefix))
     }
@@ -39,11 +41,15 @@ object Command {
   }
 
   case class UnsupportedCommand(cmd: ParsedCommand) extends Command(cmd.raw) {
+    override def toString = cmd.raw
     def rspCode = ResponseCode.ERR_UNKNOWNCOMMAND
+    def command = cmd.command
   }
 
   case class InvalidCommand(reason: InvalidCommandException, rawStr: String) extends Command(rawStr) {
+    override def toString = rawStr
     def rspCode = reason.rspCode
+    def message  = reason.message
   }
 
   def create(c: ParsedCommand): Command = {
@@ -337,7 +343,7 @@ object Command {
     val ERR_USERSDONTMATCH = Value("502") 
   }
 
-  class InvalidCommandException(message: String, val rspCode: ResponseCode.Value) extends Exception(message)
+  class InvalidCommandException(val message: String, val rspCode: ResponseCode.Value) extends Exception(message)
 
   private val handleBadChannel = { e: IllegalArgumentException =>
     throw new InvalidCommandException("Bad channel name " + e.getMessage(), ResponseCode.ERR_NOSUCHCHANNEL)

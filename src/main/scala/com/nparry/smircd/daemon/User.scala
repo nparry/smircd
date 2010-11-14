@@ -182,10 +182,12 @@ abstract sealed class User(val connection: Actor, serverId: String) {
   }
 
   def send(cmd: SupportedCommand): User = {
+    connection ! IrcServer.OutboundMessage(cmd)    
     this
   }
 
   def breakConnection(): User = {
+    connection ! IrcServer.Shutdown()
     this
   }
 
