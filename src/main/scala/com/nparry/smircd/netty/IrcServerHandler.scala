@@ -10,11 +10,15 @@ import com.nparry.smircd.daemon.IrcServer
 import com.nparry.smircd.daemon.IrcServer._
 import com.nparry.smircd.protocol.Command._
 
+import grizzled.slf4j.Logger
+
 class IrcServerHandler(ircServer: IrcServer, channels: ChannelGroup) extends SimpleChannelUpstreamHandler {
+  val logger = Logger(this.getClass())
   
   var actor: Option[Actor] = None
 
   override def channelOpen(ctx: ChannelHandlerContext, e: ChannelStateEvent) = {
+    logger.debug("Channel open for " + this)
     channels.add(e.getChannel)
   }
   
@@ -27,6 +31,7 @@ class IrcServerHandler(ircServer: IrcServer, channels: ChannelGroup) extends Sim
   }
 
   override def channelClosed(ctx: ChannelHandlerContext, e: ChannelStateEvent) = {
+    logger.debug("Channel closed for " + this)
     for (a <- actor) {
       a ! false
       a ! IrcServer.Shutdown()
@@ -36,13 +41,17 @@ class IrcServerHandler(ircServer: IrcServer, channels: ChannelGroup) extends Sim
   }
 
   override def messageReceived(ctx: ChannelHandlerContext, e: MessageEvent) = {
+    logger.trace("Channel received " + e.getMessage())
     for (a <- actor) {
       a ! e.getMessage()
     }
   }
   
   override def exceptionCaught(ctx: ChannelHandlerContext, e: ExceptionEvent) = {
-    e.getChannel.close
+    logger.warn("Channel caught exception " + e.getCause())
+    for (a <- actor) {
+      a ! false
+    }
   }
 
   class ConnectionActor(channel: Channel, ircServer: IrcServer) extends Actor {

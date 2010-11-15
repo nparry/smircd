@@ -5,6 +5,8 @@ import scala.collection.mutable.{Set => MSet}
 import com.nparry.smircd.protocol._
 import com.nparry.smircd.protocol.Command._
 
+import grizzled.slf4j.Logger
+
 object Channel {
   def sendEndOfNamesToUser(user: User): User = {
     user.reply(ResponseCode.RPL_ENDOFNAMES)
@@ -16,11 +18,15 @@ class Channel(
   memberLookup: (NickName.Normalized) => User.Registered,
   killMe: (ChannelName) => Unit) {
 
+  val logger = Logger(this.getClass())
+
   val members: MSet[NickName.Normalized] = MSet()
   var topic: Option[String] = None
 
   def newMember(user: User.Registered, cmd: JoinCommand) = {
     members.add(user.nickname.normalized)    
+    logger.debug("User " + user.nickname + " joined channel " + name + " (members=" + members.size + ")") 
+
     sendTopicTo(user)
     sendMememberNamesTo(user, true)
     reBroadcastFrom(user, cmd.copyWithNewParams(List(name.name)))
@@ -34,6 +40,7 @@ class Channel(
   def dropMember(user: User.Registered): Unit = dropMember(user.nickname)
   def dropMember(nickname: NickName): Unit = {
     members.remove(nickname.normalized)    
+    logger.debug("User " + nickname + " left channel " + name + " (members=" + members.size + ")") 
     if (members.isEmpty) killMe(name)
   }
 
@@ -50,6 +57,7 @@ class Channel(
 
   def memberKickingUser(user: User.Registered, cmd: KickCommand): User = {
     if (members.contains(cmd.user.normalized)) {
+      logger.debug("User " + cmd.user + " kicked from " + name + " by " + user.nickname)
       dropMember(cmd.user)
       reBroadcastFrom(user, cmd)
     }
@@ -86,6 +94,7 @@ class Channel(
   }
 
   def reBroadcastFrom(user: User.Registered, cmd: SupportedCommand) = {
+    logger.debug("Channel " + name + " broadcasting message " + cmd + " from " + user.nickname)
     val c = cmd.copyWithNewPrefix(user.maybeNickname.map(_.name))
     for (u <- getChannelMembers) {
       if (u != user) u.send(c)

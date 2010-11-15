@@ -5,6 +5,8 @@ import scala.actors._
 import com.nparry.smircd.protocol._
 import com.nparry.smircd.protocol.Command._
 
+import grizzled.slf4j.Logger
+
 object User {
 
   case class Pending(
@@ -149,6 +151,7 @@ object User {
 }
 
 abstract sealed class User(val connection: Actor, serverId: String) {
+  val logger = Logger(this.getClass())
 
   def maybeNickname: Option[NickName];
   def isRegistered: Boolean = maybeNickname.isDefined
@@ -169,8 +172,10 @@ abstract sealed class User(val connection: Actor, serverId: String) {
   def returnError(rspCode: ResponseCode.Value, killConnection: Boolean = false): User = returnError(rspCode, None, killConnection)
   def returnError(rspCode: ResponseCode.Value, message: String): User = returnError(rspCode, Some(message), false)
   def returnError(rspCode: ResponseCode.Value, message: Option[String], killConnection: Boolean): User = {
+    logger.debug("Sending error " + rspCode + " to user " + this)
     reply(rspCode, message)
     if (killConnection) {
+      logger.debug("Killing connection for " + this + " due to error " + rspCode)
       breakConnection()
     }
 
@@ -178,15 +183,18 @@ abstract sealed class User(val connection: Actor, serverId: String) {
   }
 
   def reply(rspCode: ResponseCode.Value, message: Iterable[String] = List()): User = {
+    logger.debug("Sending reply " + rspCode + " to user " + this)
     send(SupportedCommand(serverId, rspCode.toString, message))
   }
 
   def send(cmd: SupportedCommand): User = {
+    logger.trace("Sending " + cmd + " to user " + this)
     connection ! IrcServer.OutboundMessage(cmd)    
     this
   }
 
   def breakConnection(): User = {
+    logger.trace("Breaking connection to user " + this)
     connection ! IrcServer.Shutdown()
     this
   }
