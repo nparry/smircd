@@ -53,7 +53,7 @@ class IrcServerPipelineFactory(ircServer: IrcServer, channels: ChannelGroup) ext
     override def encode(ctx: ChannelHandlerContext, channel: Channel, msg: Object) = {
       msg match {
         case c: Command => {
-          c.toString
+          c.toString + "\r\n"
         }
         case default => msg
       }
