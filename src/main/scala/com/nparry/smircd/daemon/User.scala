@@ -184,7 +184,8 @@ abstract sealed class User(val connection: Actor, serverId: String) {
 
   def reply(rspCode: ResponseCode.Value, message: Iterable[String] = List()): User = {
     logger.debug("Sending reply " + rspCode + " to user " + this)
-    send(SupportedCommand(serverId, rspCode.toString, message))
+    val params = maybeNickname.map(_.name) ++ message
+    send(SupportedCommand(serverId, rspCode.toString, params))
   }
 
   def send(cmd: SupportedCommand): User = {

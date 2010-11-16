@@ -21,7 +21,8 @@ class IrcServerPipelineFactory(ircServer: IrcServer, channels: ChannelGroup) ext
     val pipeline = Channels.pipeline()
 
     pipeline.addLast("framer", new DelimiterBasedFrameDecoder(
-      512, ChannelBuffers.wrappedBuffer(newLine)))
+      //512, ChannelBuffers.wrappedBuffer(newLine)))
+      512, Delimiters.lineDelimiter(): _*))
 
     pipeline.addLast("stringify", new StringDecoder(utf8));
     pipeline.addLast("commandDecoder", new CommandDecoder())

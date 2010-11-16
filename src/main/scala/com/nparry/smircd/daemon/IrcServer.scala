@@ -171,8 +171,11 @@ class IrcServer(val serverId: String) extends Actor {
             case r: User.Registered => r.returnError(ResponseCode.ERR_ALREADYREGISTRED)
             case p: User.Pending => {
               deleteConnection(p)
-              updateConnection(p.asRegistered(u))
-              // TODO - send welcome message to user
+              val r = p.asRegistered(u)
+              updateConnection(r)
+              r.reply(ResponseCode.RPL_MOTDSTART, Some("- MOTD -"))
+              r.reply(ResponseCode.RPL_MOTD, Some("- Hi -"))
+              r.reply(ResponseCode.RPL_ENDOFMOTD, Some(":End of /MOTD command.'"))
             }
           }
         }
