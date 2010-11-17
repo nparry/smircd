@@ -100,6 +100,10 @@ object User {
       }
     }
 
+    def kickedFrom(channel: Channel) = {
+      copy(channels = channels -- Some(channel.name))
+    }
+
     def messageToChannel(channel: Channel, cmd: PrivMsgCommand) = {
       channels.get(channel.name) match {
         case None => returnError(ResponseCode.ERR_CANNOTSENDTOCHAN, channel.name.name)

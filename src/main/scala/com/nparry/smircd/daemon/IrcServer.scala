@@ -223,7 +223,7 @@ class IrcServer(val serverId: String) extends Actor {
           logger.debug("Kick command from " + user)
           channels.get(k.channel) match {
             case None => user.returnError(ResponseCode.ERR_NOSUCHCHANNEL, k.channel.name)
-            case Some(c) => user.kickUserFromChannel(c, k)
+            case Some(c) => updateConnection(user.kickUserFromChannel(c, k))
           }
         }
 

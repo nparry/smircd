@@ -33,8 +33,9 @@ class Channel(
   }
 
   def partingMember(user: User.Registered, cmd: PartCommand) = {
+    val u = reBroadcastFrom(user, cmd.copyWithNewParams(List(name.name)))
     dropMember(user)
-    reBroadcastFrom(user, cmd.copyWithNewParams(List(name.name)))
+    u
   }
 
   def dropMember(user: User.Registered): Unit = dropMember(user.nickname)
@@ -58,8 +59,9 @@ class Channel(
   def memberKickingUser(user: User.Registered, cmd: KickCommand): User = {
     if (members.contains(cmd.user.normalized)) {
       logger.debug("User " + cmd.user + " kicked from " + name + " by " + user.nickname)
-      dropMember(cmd.user)
       reBroadcastFrom(user, cmd)
+      dropMember(cmd.user)
+      memberLookup(cmd.user.normalized).kickedFrom(this)
     }
     else {
       user.returnError(ResponseCode.ERR_USERNOTINCHANNEL, cmd.user.name)
