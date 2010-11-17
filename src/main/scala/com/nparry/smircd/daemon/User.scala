@@ -108,7 +108,13 @@ object User {
     }
 
     def away(cmd: AwayCommand) = {
-      def newUser = copy(awayMessage = cmd.message)
+      val msg = cmd.message match {
+        case Some("") => None
+        case Some(m) => Some(m) 
+        case None => None
+      }
+
+      val newUser = copy(awayMessage = msg)
       newUser.awayMessage match {
         case None => newUser.reply(ResponseCode.RPL_UNAWAY)
         case Some(_) => newUser.reply(ResponseCode.RPL_NOWAWAY)
@@ -117,10 +123,9 @@ object User {
 
     def messageFrom(sender: User, cmd: PrivMsgCommand) = {
       for (msg <- awayMessage) {
-        sender.send(SupportedCommand(
-          maybeNickname.map(_.name),
-          ResponseCode.RPL_AWAY.toString,
-          Some(msg)))
+        sender.reply(
+          ResponseCode.RPL_AWAY,
+          maybeNickname.map(_.name) ++ Some(msg))
       }
 
       send(cmd.copyWithNewPrefix(sender.maybeNickname.map(_.name)))
