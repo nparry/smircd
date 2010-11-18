@@ -9,7 +9,7 @@ import grizzled.slf4j.Logger
 
 object Channel {
   def sendEndOfNamesToUser(user: User): User = {
-    user.reply(ResponseCode.RPL_ENDOFNAMES)
+    user.reply(ResponseCode.RPL_ENDOFNAMES, Some("*"))
   }
 }
 
@@ -77,6 +77,7 @@ class Channel(
 
   def sendMememberNamesTo(user: User, includeEON: Boolean): User = {
     user.reply(ResponseCode.RPL_NAMREPLY, List(
+      "=",
       name.name,
       getChannelMembers.map(_.nickname.name).mkString(" ")))
 
