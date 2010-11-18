@@ -181,7 +181,7 @@ abstract sealed class User(val connection: Actor, serverId: String) {
   def returnError(rspCode: ResponseCode.Value, killConnection: Boolean = false): User = returnError(rspCode, None, killConnection)
   def returnError(rspCode: ResponseCode.Value, message: String): User = returnError(rspCode, Some(message), false)
   def returnError(rspCode: ResponseCode.Value, message: Option[String], killConnection: Boolean): User = {
-    logger.debug("Sending error " + rspCode + " to user " + this)
+    logger.debug("Sending error " + rspCode + " to " + this)
     reply(rspCode, message)
     if (killConnection) {
       logger.debug("Killing connection for " + this + " due to error " + rspCode)
@@ -192,22 +192,28 @@ abstract sealed class User(val connection: Actor, serverId: String) {
   }
 
   def reply(rspCode: ResponseCode.Value, message: Iterable[String] = List()): User = {
-    logger.debug("Sending reply " + rspCode + " to user " + this)
+    logger.debug("Sending reply " + rspCode + " to " + this)
     val params = maybeNickname.map(_.name) ++ message
     send(SupportedCommand(serverId, rspCode.toString, params))
   }
 
   def send(cmd: SupportedCommand): User = {
-    logger.trace("Sending " + cmd + " to user " + this)
+    logger.trace("Sending " + cmd + " to " + this)
     connection ! IrcServer.OutboundMessage(cmd)    
     this
   }
 
   def breakConnection(): User = {
-    logger.trace("Breaking connection to user " + this)
+    logger.trace("Breaking connection to " + this)
     connection ! IrcServer.Shutdown()
     this
   }
 
+  override def toString() = {
+    getClass().getSimpleName() +
+    "User(" +
+    maybeNickname.map(_.name).getOrElse("<no nickname>") +
+    ")"
+  }
 }
 

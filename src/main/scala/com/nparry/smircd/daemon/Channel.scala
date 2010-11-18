@@ -25,7 +25,7 @@ class Channel(
 
   def newMember(user: User.Registered, cmd: JoinCommand) = {
     members.add(user.nickname.normalized)    
-    logger.debug("User " + user.nickname + " joined channel " + name + " (members=" + members.size + ")") 
+    logger.debug(user + " joined " + this) 
 
     sendTopicTo(user)
     sendMememberNamesTo(user, true)
@@ -41,7 +41,7 @@ class Channel(
   def dropMember(user: User.Registered): Unit = dropMember(user.nickname)
   def dropMember(nickname: NickName): Unit = {
     members.remove(nickname.normalized)    
-    logger.debug("User " + nickname + " left channel " + name + " (members=" + members.size + ")") 
+    logger.debug(nickname + " left " + this) 
     if (members.isEmpty) killMe(name)
   }
 
@@ -58,7 +58,7 @@ class Channel(
 
   def memberKickingUser(user: User.Registered, cmd: KickCommand): User = {
     if (members.contains(cmd.user.normalized)) {
-      logger.debug("User " + cmd.user + " kicked from " + name + " by " + user.nickname)
+      logger.debug(cmd.user + " kicked from " + this + " by " + user)
       reBroadcastFrom(user, cmd)
       dropMember(cmd.user)
       memberLookup(cmd.user.normalized).kickedFrom(this)
@@ -96,7 +96,7 @@ class Channel(
   }
 
   def reBroadcastFrom(user: User.Registered, cmd: SupportedCommand) = {
-    logger.debug("Channel " + name + " broadcasting message " + cmd + " from " + user.nickname)
+    logger.debug(this + " broadcasting message " + cmd + " from " + user)
     val c = cmd.copyWithNewPrefix(user.maybeNickname.map(_.name))
     for (u <- getChannelMembers) {
       if (u != user) u.send(c)
@@ -107,6 +107,10 @@ class Channel(
 
   private def getChannelMembers: Iterable[User.Registered] = {
     members.map(memberLookup(_))
+  }
+
+  override def toString() = {
+    "Channel(" + name.name + ", members=" + members.size + ")"
   }
 }
 
