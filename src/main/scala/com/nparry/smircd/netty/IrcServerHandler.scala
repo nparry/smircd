@@ -6,13 +6,13 @@ import scala.actors.Actor._
 import org.jboss.netty.channel._
 import org.jboss.netty.channel.group._
 
+import com.nparry.smircd.daemon.ActorBasedDaemon.Daemon
 import com.nparry.smircd.daemon.IrcServer
-import com.nparry.smircd.daemon.IrcServer._
 import com.nparry.smircd.protocol.Command._
 
 import grizzled.slf4j.Logger
 
-class IrcServerHandler(ircServer: IrcServer, channels: ChannelGroup) extends SimpleChannelUpstreamHandler {
+class IrcServerHandler(ircServer: Daemon, channels: ChannelGroup) extends SimpleChannelUpstreamHandler {
   val logger = Logger(this.getClass())
   
   var actor: Option[Actor] = None
@@ -54,7 +54,7 @@ class IrcServerHandler(ircServer: IrcServer, channels: ChannelGroup) extends Sim
     }
   }
 
-  class ConnectionActor(channel: Channel, ircServer: IrcServer) extends Actor {
+  class ConnectionActor(channel: Channel, ircServer: Daemon) extends Actor {
 
     def toServer(a: Any) = {
       ircServer ! (this, a)

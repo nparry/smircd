@@ -9,10 +9,10 @@ import org.jboss.netty.handler.codec.oneone._
 import org.jboss.netty.handler.codec.frame._
 import org.jboss.netty.handler.codec.string._
 
-import com.nparry.smircd.daemon.IrcServer
+import com.nparry.smircd.daemon.ActorBasedDaemon.Daemon
 import com.nparry.smircd.protocol._
 
-class IrcServerPipelineFactory(ircServer: IrcServer, channels: ChannelGroup) extends ChannelPipelineFactory {
+class IrcServerPipelineFactory(ircServer: Daemon, channels: ChannelGroup) extends ChannelPipelineFactory {
 
   val newLine: Array[Byte] = Array('\r', '\n')
   val utf8 = Charset.forName("UTF-8")

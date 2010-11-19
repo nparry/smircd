@@ -8,9 +8,9 @@ import org.jboss.netty.channel._
 import org.jboss.netty.channel.group._
 import org.jboss.netty.channel.socket.nio._
 
-import com.nparry.smircd.daemon.IrcServer
+import com.nparry.smircd.daemon.ActorBasedDaemon._
 
-class NettyServer(ircServer: IrcServer, port: Int) {
+class NettyServer(ircServer: Daemon, port: Int) {
 
   var channels: Option[ChannelGroup] = None
   var channelFactory: Option[ChannelFactory] = None
