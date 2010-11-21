@@ -26,6 +26,8 @@ trait IrcServerComponent {
     val activeConnections = MMap[Connection, User.Registered]()
   
     val lastSeen = MMap[Connection, Date]()
+
+    def connectionStats = (pendingConnections.size, activeConnections.size)
   
     def updateConnection[U <: User](u: U): U = {
       logger.trace("Updating connection for " + u)

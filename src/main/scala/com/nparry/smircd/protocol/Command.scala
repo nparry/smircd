@@ -23,6 +23,8 @@ object Command {
       new SupportedCommand(cmd.copy(params=newParams))
     }
 
+    def command = cmd.command
+
     protected def p(i: Int) = cmd.params(i)
     protected def maybeP(i: Int) = if (i < cmd.params.size) Some(p(i)) else None
 
