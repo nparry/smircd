@@ -29,6 +29,17 @@ class IrcServerSpec extends Specification {
 
     }
 
+    "supportNickNameChanges" in {
+      val c = connection.connect().send("NICK foo")
+      c must ownNickName("foo")
+      c.send("NICK bar")
+      c must ownNickName("bar")
+      c.send("USER blah blah blah blah")
+      c must ownNickName("bar")
+      c.send("NICK baz")
+      c must ownNickName("baz")
+    }
+
     "preventPendingNickClashVsPendingConnection" in {
       val c1 = connection.connect()
       val c2 = connection.connect()
