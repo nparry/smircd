@@ -6,6 +6,7 @@ import com.nparry.smircd.protocol._
 import com.nparry.smircd.protocol.Command._
 
 import org.specs.Specification
+import org.specs.matcher.Matcher
 
 class IrcServerSpec extends Specification {
 
@@ -15,33 +16,151 @@ class IrcServerSpec extends Specification {
   "IrcServer" should {
 
     "sendMotdOnLogin" in {
-      val c = connection
-      c.connect()
-      c.send(
+      val c = connection.connect().send(
         "NICK foo",
         "USER blah blah blah blah")
 
-      c.verifyReplySequence(
+      connectionCounts mustEqual (0, 1)
+      c must ownNickName("foo")
+      c must haveReplySequence(
         ResponseCode.RPL_MOTDSTART, 
         ResponseCode.RPL_MOTD,
         ResponseCode.RPL_ENDOFMOTD)
 
-      verifyConnectionCounts(0, 1)
-      c.verifyNickOwnership("foo")
     }
 
+    "preventPendingNickClashVsPendingConnection" in {
+      val c1 = connection.connect()
+      val c2 = connection.connect()
+
+      connectionCounts mustEqual (2, 0)
+
+      c1.send("NICK foo")
+      c2.send("NICK Foo")
+
+      connectionCounts mustEqual (1, 0)
+      c1 must beEmpty
+      c1 must ownNickName("foo")
+      c2 must haveReplySequence(ResponseCode.ERR_NICKNAMEINUSE)
+      c2 must beDisconnected
+    }
+
+    "preventPendingNickClashVsActiveConnection" in {
+      val c1 = connection.connect()
+      val c2 = connection.connect()
+
+      connectionCounts mustEqual (2, 0)
+
+      c1.send(
+        "NICK foo",
+        "USER blah blah blah blah")
+      connectionCounts mustEqual (1, 1)
+      c1 must ownNickName("foo")
+
+      c2.send("NICK Foo")
+
+      connectionCounts mustEqual (0, 1)
+      c1 must beConnected // Not really obeying IRC spec
+      c1 must ownNickName("foo")
+      c2 must haveReplySequence(ResponseCode.ERR_NICKNAMEINUSE)
+      c2 must beDisconnected
+    }
+
+    "preventActiveNickClashVsPendingConnection" in {
+      val c1 = connection.connect().send(
+        "NICK foo",
+        "USER blah blah blah blah")
+      val c2 = connection.connect().send("NICK bar")
+
+      connectionCounts mustEqual (1, 1)
+      c1 must ownNickName("foo")
+      c2 must ownNickName("bar")
+
+      c1.clearBuffer().send("NICK bar")
+
+      connectionCounts mustEqual (1, 1)
+      c1 must beConnected
+      c1 must haveReplySequence(ResponseCode.ERR_NICKCOLLISION)
+      c1 must ownNickName("foo")
+      c2 must beConnected
+      c2 must beEmpty
+      c2 must ownNickName("bar")
+    }
+
+    "preventActiveNickClashVsActiveConnection" in {
+      val c1 = connection.connect().send(
+        "NICK foo",
+        "USER blah blah blah blah")
+      val c2 = connection.connect().send(
+        "NICK bar",
+        "USER blah blah blah blah")
+
+      connectionCounts mustEqual (0, 2)
+      c1 must ownNickName("foo")
+      c2 must ownNickName("bar")
+
+      c2.clearBuffer()
+      c1.clearBuffer().send("NICK bar")
+
+      connectionCounts mustEqual (0, 2)
+      c1 must beConnected
+      c1 must haveReplySequence(ResponseCode.ERR_NICKCOLLISION)
+      c1 must ownNickName("foo")
+      c2 must beConnected
+      c2 must beEmpty
+      c2 must ownNickName("bar")
+    }
   }
 
-  def verifyConnectionCounts(pending: Int, active: Int) = {
-    (pending, active) mustEqual unitTestServer.connectionStats
+  def connectionCounts = unitTestServer.connectionStats
+
+  val beDisconnected = new Matcher[C]() {
+    def apply(c: => C) = (
+      c.buffer.endsWith(List(IrcServer.Shutdown())),
+      "connection is disconnected",
+      "connection is not disconnected")
   }
+
+  val beConnected = beDisconnected.not
+
+  def ownNickName(nick: String) = new Matcher[C] {
+    def apply(c: => C) = c.server.getUser(c) { u => u } match {
+      case None => tripple(false, "No user")
+      case Some(u) => u.maybeNickname match {
+        case None => tripple(false, "No nickname")
+        case Some(n) => (
+          n.normalized.equals(NickName(nick).normalized),
+          nick + " equals " + n.normalized.normalized,
+          nick + " does not equal " + n.normalized.normalized)
+      }
+    }
+  }
+
+  def haveReplySequence(replies: ResponseCode.Value*) = new Matcher[C] {
+    def apply(c: => C) = matchReplies(c, replies: _*).find(!_._1).getOrElse(tripple(true, "All replies match"))
+  }
+
+  def matchReplies(c: C, replies: ResponseCode.Value*): Iterable[Tuple3[Boolean, String, String]] = {
+    for (r <- replies) yield
+      if (c.buffer.isEmpty())
+        tripple(false, "Empty buffer looking for " + r)
+      else
+        c.buffer.dequeue match {
+          case IrcServer.OutboundMessage(c) =>
+            if (c.command.equals(r.toString())) tripple(true, "match")
+            else tripple(false, c.command + " does not match " + r)
+          case x: Any => tripple(false,  "Found " + x + " looking for " + r)
+        }
+  }
+
+  def tripple(b: Boolean, s: String) = (b, s, s)
 
   object C {
     val counter = new java.util.concurrent.atomic.AtomicInteger(0)
     def apply(s: Server.IrcServer) = new C(counter.getAndIncrement(), s)
   }
 
-  class C(val id: Int, server: Server.IrcServer) {
+  class C(val id: Int, val server: Server.IrcServer) {
     val buffer: Queue[Any] = Queue()
 
     override def hashCode() = id.hashCode()
@@ -50,31 +169,19 @@ class IrcServerSpec extends Specification {
       case _ => false
     }
 
-    def connect() = server.processIncomingMsg((this, true))
-    def disconnect() = server.processIncomingMsg((this, false))
-    def send(msg: String*) = for (m <- msg) {
-      server.processIncomingMsg((
-        this,
-        Command.create(CommandParser.parse(m).right.get)))
-    }
+    def isEmpty = buffer.isEmpty
+    def clearBuffer() = { buffer.clear(); this }
 
-    def verifyReplySequence(replies: ResponseCode.Value*) = for (r <- replies) {
-      buffer.isEmpty() mustBe false
-      buffer.dequeue match {
-        case IrcServer.OutboundMessage(c) => {
-          c.command mustEqual r.toString()
-        }
-        case x: Any => fail(x + " is not an outbound message (expecting " + r + ")")
-
+    def connect() = { server.processIncomingMsg((this, true)); this }
+    def disconnect() = { server.processIncomingMsg((this, false)); this }
+    def send(msg: String*) = {
+      for (m <- msg) {
+        server.processIncomingMsg((
+          this,
+          Command.create(CommandParser.parse(m).right.get)))
       }
+      this
     }
-
-    def verifyNickOwnership(nick: String) = {
-      val u = server.getUser(this) { u => u }.getOrElse(fail("Unable to get target user"))
-      val actualNick  = u.maybeNickname.getOrElse(fail("User does not have a nickname"))
-      actualNick.normalized mustEqual NickName(nick).normalized
-    }
-
   }
 
   object Server extends ConnectionComponent
