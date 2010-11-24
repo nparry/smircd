@@ -84,6 +84,8 @@ trait IrcServerComponent {
     def isNickCollision(user: User, nick: NickName) = {
       userInfo.get(nick.normalized).map(_ != user.connection).getOrElse(false)
     }
+
+    def currentNicks = userInfo.keySet
   
     val channels = MMap[ChannelName, Channel]()
   

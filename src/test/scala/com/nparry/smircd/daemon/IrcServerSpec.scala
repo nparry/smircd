@@ -32,12 +32,19 @@ class IrcServerSpec extends Specification {
     "supportNickNameChanges" in {
       val c = connection.connect().send("NICK foo")
       c must ownNickName("foo")
+      nicknames must beEqualTo(Set("foo"))
+
       c.send("NICK bar")
       c must ownNickName("bar")
+      nicknames must beEqualTo(Set("bar"))
+
       c.send("USER blah blah blah blah")
       c must ownNickName("bar")
+      nicknames must beEqualTo(Set("bar"))
+
       c.send("NICK baz")
       c must ownNickName("baz")
+      nicknames must beEqualTo(Set("baz"))
     }
 
     "preventPendingNickClashVsPendingConnection" in {
@@ -124,6 +131,7 @@ class IrcServerSpec extends Specification {
   }
 
   def connectionCounts = unitTestServer.connectionStats
+  def nicknames = unitTestServer.currentNicks.map(_.normalized)
 
   val beDisconnected = new Matcher[C]() {
     def apply(c: => C) = (
