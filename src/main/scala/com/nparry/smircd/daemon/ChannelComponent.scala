@@ -49,10 +49,10 @@ trait ChannelComponent {
       if (members.isEmpty) killMe(name)
     }
   
-    def memberChangedNickName(user: User.Registered, oldNick: NickName, cmd: NickCommand) = {
-      members.remove(oldNick.normalized)    
-      members.add(user.nickname.normalized)    
+    def memberChangedNickName(user: User.Registered, newNick: NickName, cmd: NickCommand) = {
       reBroadcastFrom(user, cmd)
+      members.remove(user.nickname.normalized)
+      members.add(newNick.normalized)
     }
   
     def memberChangedTopic(user: User.Registered, cmd: TopicCommand): User.Registered = {
@@ -97,14 +97,14 @@ trait ChannelComponent {
     }
   
     def messageFrom(user: User.Registered, cmd: PrivMsgCommand) = {
-      reBroadcastFrom(user, cmd)
+      reBroadcastFrom(user, cmd, false)
     }
   
-    def reBroadcastFrom(user: User.Registered, cmd: SupportedCommand) = {
+    def reBroadcastFrom(user: User.Registered, cmd: SupportedCommand, includeSender: Boolean = true) = {
       logger.debug(this + " broadcasting message " + cmd + " from " + user)
       val c = cmd.copyWithNewPrefix(user.maybeNickname.map(_.name))
       for (u <- getChannelMembers) {
-        if (u != user) u.send(c)
+        if (u != user || includeSender) u.send(c)
       }
   
       user

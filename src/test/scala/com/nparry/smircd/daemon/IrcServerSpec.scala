@@ -152,7 +152,8 @@ class IrcServerSpec extends Specification {
         "JOIN #chan")
 
       c2.clearBuffer()
-      c1.send("NICK baz")
+      c1.clearBuffer().send("NICK baz")
+      c1 must haveMessageSequence(":foo NICK baz")
       c2 must haveMessageSequence(":foo NICK baz")
     }
 

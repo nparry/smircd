@@ -2,7 +2,6 @@ package com.nparry.smircd.daemon
 
 import java.util.Date
 
-
 import scala.collection.mutable.{Map => MMap}
 
 import com.nparry.smircd.protocol._
@@ -165,8 +164,9 @@ trait IrcServerComponent {
             }
           }
           else {
+            val result = updateConnection(user.updateNickname(n))
             updateNick(user, Some(n.nickname)) 
-            updateConnection(user.updateNickname(n))
+            result
           }
         }
   

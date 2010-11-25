@@ -54,7 +54,7 @@ trait UserComponent {
       def updateNickname(cmd: NickCommand) = {
         val newUser = copy(nickname=cmd.nickname)
         for (chan <- channels.values) {
-          chan.memberChangedNickName(newUser, this.nickname, cmd)
+          chan.memberChangedNickName(this, newUser.nickname, cmd)
         }
   
         newUser
