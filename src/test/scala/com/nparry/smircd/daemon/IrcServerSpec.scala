@@ -128,10 +128,40 @@ class IrcServerSpec extends Specification {
       c2 must beEmpty
       c2 must ownNickName("bar")
     }
+
+    "reflectNickChangesOnChannels" in {
+      val c = connection.connect().send(
+        "NICK foo",
+        "USER blah blah blah blah",
+        "JOIN #chan")
+
+      channelMembers("#chan") must beEqualTo(Set("foo"))
+
+      c.send("NICK bar")
+      channelMembers("#chan") must beEqualTo(Set("bar"))
+    }
+
+    "tellChanMembersAboutNickChanges" in {
+      val c1 = connection.connect().send(
+        "NICK foo",
+        "USER blah blah blah blah",
+        "JOIN #chan")
+      val c2 = connection.connect().send(
+        "NICK bar",
+        "USER blah blah blah blah",
+        "JOIN #chan")
+
+      c2.clearBuffer()
+      c1.send("NICK baz")
+      c2 must haveMessageSequence(":foo NICK baz")
+    }
+
   }
 
   def connectionCounts = unitTestServer.connectionStats
   def nicknames = unitTestServer.currentNicks.map(_.normalized)
+  def channel(name: String) = unitTestServer.getChannel(ChannelName(name))
+  def channelMembers(name: String): Set[String] = channel(name).members.map(_.normalized).toSet
 
   val beDisconnected = new Matcher[C]() {
     def apply(c: => C) = (
@@ -156,19 +186,39 @@ class IrcServerSpec extends Specification {
   }
 
   def haveReplySequence(replies: ResponseCode.Value*) = new Matcher[C] {
-    def apply(c: => C) = matchReplies(c, replies: _*).find(!_._1).getOrElse(tripple(true, "All replies match"))
+    def apply(c: => C) = pickMatchResult(
+      matchMessages(c, replies.map(r => { c: SupportedCommand =>
+        checkEquality(r.toString, c.command)
+      })),
+      "All replies match")
   }
 
-  def matchReplies(c: C, replies: ResponseCode.Value*): Iterable[Tuple3[Boolean, String, String]] = {
-    for (r <- replies) yield
+  def haveMessageSequence(msgs: String*) = new Matcher[C] {
+    def apply(c: => C) = pickMatchResult(
+      matchMessages(c, msgs.map(m => { c: SupportedCommand =>
+        checkEquality(Command.create(CommandParser.parse(m).right.get).toString, c.toString)
+      })),
+      "All messages match")
+  }
+
+  def pickMatchResult(r: Iterable[Tuple3[Boolean, String, String]], okMsg: String) =
+    r.find(!_._1).getOrElse(tripple(true, okMsg))
+
+  def checkEquality(expected: String, actual: String) =
+    if (expected.equals(actual)) None
+    else Some(actual + " does not equal " + expected)
+
+  def matchMessages(c: C, predicates: Iterable[(SupportedCommand) => Option[String]]): Iterable[Tuple3[Boolean, String, String]] = {
+    for (p <- predicates) yield
       if (c.buffer.isEmpty())
-        tripple(false, "Empty buffer looking for " + r)
+        tripple(false, "Empty buffer")
       else
         c.buffer.dequeue match {
-          case IrcServer.OutboundMessage(c) =>
-            if (c.command.equals(r.toString())) tripple(true, "match")
-            else tripple(false, c.command + " does not match " + r)
-          case x: Any => tripple(false,  "Found " + x + " looking for " + r)
+          case IrcServer.OutboundMessage(c) => p(c) match {
+            case Some(error) => tripple(false, error)
+            case None => tripple(true, "match")
+          }
+          case x: Any => tripple(false,  "Found " + x + " instead of a message")
         }
   }
 
