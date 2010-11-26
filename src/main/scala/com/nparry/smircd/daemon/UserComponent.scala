@@ -180,16 +180,11 @@ trait UserComponent {
   
     def reBroadcast(cmd: SupportedCommand): User;
   
-    def returnError(rspCode: ResponseCode.Value, killConnection: Boolean = false): User = returnError(rspCode, None, killConnection)
-    def returnError(rspCode: ResponseCode.Value, message: String): User = returnError(rspCode, Some(message), false)
-    def returnError(rspCode: ResponseCode.Value, message: Option[String], killConnection: Boolean): User = {
+    def returnError(rspCode: ResponseCode.Value): User = returnError(rspCode, None)
+    def returnError(rspCode: ResponseCode.Value, message: String): User = returnError(rspCode, Some(message))
+    def returnError(rspCode: ResponseCode.Value, message: Option[String]): User = {
       logger.debug("Sending error " + rspCode + " to " + this)
       reply(rspCode, message)
-      if (killConnection) {
-        logger.debug("Killing connection for " + this + " due to error " + rspCode)
-        breakConnection()
-      }
-  
       this
     }
   

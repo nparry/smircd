@@ -34,7 +34,6 @@ class IrcServerHandler(ircServer: Daemon, channels: ChannelGroup) extends Simple
     logger.debug("Channel closed for " + this)
     for (a <- actor) {
       a ! false
-      a ! IrcServer.Shutdown()
     }
 
     actor = None

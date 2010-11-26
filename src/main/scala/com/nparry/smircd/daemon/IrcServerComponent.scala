@@ -155,7 +155,7 @@ trait IrcServerComponent {
             logger.debug("Nickname collision for " + user + " using " + n.nickname)
             user match {
               case p: User.Pending => {
-                user.returnError(ResponseCode.ERR_NICKNAMEINUSE, true)
+                user.returnError(ResponseCode.ERR_NICKNAMEINUSE)
                 deleteUser(p)
               }
               case r: User.Registered => {

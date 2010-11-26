@@ -157,6 +157,46 @@ class IrcServerSpec extends Specification {
       c2 must haveMessageSequence(":foo NICK baz")
     }
 
+    "updateServerStateOnQuit" in {
+      val c = connection.connect().send(
+        "NICK foo",
+        "USER blah blah blah blah")
+
+      connectionCounts mustEqual (0, 1)
+
+      c.clearBuffer().send("QUIT")
+
+      connectionCounts mustEqual (0, 0)
+      nicknames must beEqualTo(Set())
+      c must beDisconnected
+    }
+
+    "updateServerStateOnAbruptDisconnect" in {
+      val c = connection.connect().send(
+        "NICK foo",
+        "USER blah blah blah blah")
+
+      connectionCounts mustEqual (0, 1)
+
+      c.clearBuffer().disconnect()
+
+      connectionCounts mustEqual (0, 0)
+      nicknames must beEqualTo(Set())
+      c must beDisconnected
+    }
+
+    "handleDisconnectEventAfterQuit" in {
+      val c = connection.connect().send(
+        "NICK foo",
+        "USER blah blah blah blah")
+
+      c.clearBuffer().send("QUIT")
+      c must beDisconnected
+
+      c.clearBuffer().disconnect()
+      c must beEmpty
+    }
+
   }
 
   def connectionCounts = unitTestServer.connectionStats
@@ -166,12 +206,17 @@ class IrcServerSpec extends Specification {
 
   val beDisconnected = new Matcher[C]() {
     def apply(c: => C) = (
-      c.buffer.endsWith(List(IrcServer.Shutdown())),
+      c.buffer.size == 1 && c.buffer.endsWith(List(IrcServer.Shutdown())),
       "connection is disconnected",
       "connection is not disconnected")
   }
 
-  val beConnected = beDisconnected.not
+  val beConnected = new Matcher[C]() {
+    def apply(c: => C) = (
+      !c.buffer.contains(IrcServer.Shutdown()),
+      "connection is connected",
+      "connection is not connected")
+  }
 
   def ownNickName(nick: String) = new Matcher[C] {
     def apply(c: => C) = c.server.getUser(c) { u => u } match {
@@ -188,38 +233,50 @@ class IrcServerSpec extends Specification {
 
   def haveReplySequence(replies: ResponseCode.Value*) = new Matcher[C] {
     def apply(c: => C) = pickMatchResult(
-      matchMessages(c, replies.map(r => { c: SupportedCommand =>
-        checkEquality(r.toString, c.command)
+      matchMessages(c, replies.map(r => { cmd: SupportedCommand =>
+        checkEquality(r.toString, cmd.command)
       })),
       "All replies match")
   }
 
   def haveMessageSequence(msgs: String*) = new Matcher[C] {
     def apply(c: => C) = pickMatchResult(
-      matchMessages(c, msgs.map(m => { c: SupportedCommand =>
-        checkEquality(Command.create(CommandParser.parse(m).right.get).toString, c.toString)
+      matchMessages(c, msgs.map(m => { cmd: SupportedCommand =>
+        checkEquality(Command.create(CommandParser.parse(m).right.get).toString, cmd.toString)
       })),
       "All messages match")
+  }
+
+  def haveCommandSequence(cmds: Any*) = new Matcher[C] {
+    def apply(c: => C) = pickMatchResult(
+      matchBufferContents(c, cmds.map(cmd => { a: Any =>
+        checkEquality(cmd, a)
+      })),
+      "All commands match")
   }
 
   def pickMatchResult(r: Iterable[Tuple3[Boolean, String, String]], okMsg: String) =
     r.find(!_._1).getOrElse(tripple(true, okMsg))
 
-  def checkEquality(expected: String, actual: String) =
+  def checkEquality(expected: Any, actual: Any) =
     if (expected.equals(actual)) None
     else Some(actual + " does not equal " + expected)
 
   def matchMessages(c: C, predicates: Iterable[(SupportedCommand) => Option[String]]): Iterable[Tuple3[Boolean, String, String]] = {
+    matchBufferContents(c, predicates.map(p => { a: Any => a match {
+      case IrcServer.OutboundMessage(m) => p(m)
+      case x: Any => Some("Found " + x + " instead of a message")
+    }}))
+  }
+
+  def matchBufferContents(c: C, predicates: Iterable[(Any) => Option[String]]): Iterable[Tuple3[Boolean, String, String]] = {
     for (p <- predicates) yield
       if (c.buffer.isEmpty())
         tripple(false, "Empty buffer")
       else
-        c.buffer.dequeue match {
-          case IrcServer.OutboundMessage(c) => p(c) match {
-            case Some(error) => tripple(false, error)
-            case None => tripple(true, "match")
-          }
-          case x: Any => tripple(false,  "Found " + x + " instead of a message")
+        p(c.buffer.dequeue) match {
+          case Some(error) => tripple(false, error)
+          case None => tripple(true, "match")
         }
   }
 
