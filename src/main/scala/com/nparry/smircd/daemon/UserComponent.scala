@@ -183,13 +183,15 @@ trait UserComponent {
     def returnError(rspCode: ResponseCode.Value): User = returnError(rspCode, None)
     def returnError(rspCode: ResponseCode.Value, message: String): User = returnError(rspCode, Some(message))
     def returnError(rspCode: ResponseCode.Value, message: Option[String]): User = {
-      logger.debug("Sending error " + rspCode + " to " + this)
-      reply(rspCode, message)
-      this
+      sendRspCode("error", rspCode, message)
     }
   
     def reply(rspCode: ResponseCode.Value, message: Iterable[String] = List()): User = {
-      logger.debug("Sending reply " + rspCode + " to " + this)
+      sendRspCode("reply", rspCode, message)
+    }
+
+    def sendRspCode(msgType: String, rspCode: ResponseCode.Value, message: Iterable[String]): User = {
+      logger.debug("Sending " + msgType + " " + rspCode + " to " + this)
       val params = maybeNickname.map(_.name) ++ message
       send(SupportedCommand(serverId, rspCode.toString, params))
     }
