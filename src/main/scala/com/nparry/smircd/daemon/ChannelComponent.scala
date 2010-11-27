@@ -31,9 +31,9 @@ trait ChannelComponent {
       members.add(user.nickname.normalized)    
       logger.debug(user + " joined " + this) 
   
+      reBroadcastFrom(user, cmd.copyWithNewParams(List(name.name)))
       sendTopicTo(user)
       sendMememberNamesTo(user, true)
-      reBroadcastFrom(user, cmd.copyWithNewParams(List(name.name)))
     }
   
     def partingMember(user: User.Registered, cmd: PartCommand) = {

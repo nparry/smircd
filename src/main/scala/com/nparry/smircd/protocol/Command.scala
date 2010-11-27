@@ -24,6 +24,7 @@ object Command {
     }
 
     def command = cmd.command
+    def params = cmd.params
 
     protected def p(i: Int) = cmd.params(i)
     protected def maybeP(i: Int) = if (i < cmd.params.size) Some(p(i)) else None

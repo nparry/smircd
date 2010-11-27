@@ -233,6 +233,55 @@ class IrcServerSpec extends Specification {
       channelMembers("#chan") must beEqualTo(Set("bar"))
     }
 
+    "sendExpectedMsgsToFirstChannelMember" in {
+      val c = connection.connect().send(
+        "NICK foo",
+        "USER blah blah blah blah")
+      c.clearBuffer().send("JOIN #chan")
+
+      c must haveMessageSequence(":foo JOIN #chan")
+      c must haveReplySequence(ResponseCode.RPL_NOTOPIC)
+      c must haveReplyAndParamSequence(
+        (ResponseCode.RPL_NAMREPLY, List("foo", "=", "#chan", "foo")))
+      c must haveReplySequence(ResponseCode.RPL_ENDOFNAMES)
+    }
+
+    "sendExpectedMsgsToSecondChannelMember" in {
+      val c1 = connection.connect().send(
+        "NICK foo",
+        "USER blah blah blah blah",
+        "JOIN #chan")
+
+      val c2 = connection.connect().send(
+        "NICK bar",
+        "USER blah blah blah blah")
+      c2.clearBuffer().send("JOIN #chan")
+
+      c2 must haveMessageSequence(":bar JOIN #chan")
+      c2 must haveReplySequence(ResponseCode.RPL_NOTOPIC)
+      c2 must haveReplyAndParamSequence(
+        (ResponseCode.RPL_NAMREPLY, List("bar", "=", "#chan", "bar foo")))
+      c2 must haveReplySequence(ResponseCode.RPL_ENDOFNAMES)
+    }
+
+    "tellChanMembersAboutJoins" in {
+      val c1 = connection.connect().send(
+        "NICK foo",
+        "USER blah blah blah blah",
+        "JOIN #chan")
+
+      channelMembers("#chan") must beEqualTo(Set("foo"))
+
+      c1.clearBuffer()
+      val c2 = connection.connect().send(
+        "NICK bar",
+        "USER blah blah blah blah",
+        "JOIN #chan")
+
+      channelMembers("#chan") must beEqualTo(Set("foo", "bar"))
+      c1 must haveMessageSequence(":bar JOIN #chan")
+    }
+
   }
 
   def connectionCounts = unitTestServer.connectionStats
@@ -271,6 +320,14 @@ class IrcServerSpec extends Specification {
     def apply(c: => C) = pickMatchResult(
       matchMessages(c, replies.map(r => { cmd: SupportedCommand =>
         checkEquality(r.toString, cmd.command)
+      })),
+      "All replies match")
+  }
+
+  def haveReplyAndParamSequence(replies: Tuple2[ResponseCode.Value, Iterable[String]]*) = new Matcher[C] {
+    def apply(c: => C) = pickMatchResult(
+      matchMessages(c, replies.map(r => { cmd: SupportedCommand =>
+        checkEquality(r._1.toString, cmd.command) orElse(checkEquality(r._2.toList, cmd.params.toList))
       })),
       "All replies match")
   }
