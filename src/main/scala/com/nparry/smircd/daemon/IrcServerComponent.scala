@@ -12,6 +12,8 @@ import grizzled.slf4j.Logger
 object IrcServer {
   case class OutboundMessage(cmd: SupportedCommand)
   case class Shutdown()
+
+  val connectionLostMsg = "Connection lost"
 }
 
 trait IrcServerComponent {
@@ -136,7 +138,8 @@ trait IrcServerComponent {
               deleteUser(user.reBroadcast(SupportedCommand(
                 user.maybeNickname.map(_.name),
                 "QUIT",
-                Some("Connection lost"))))
+                Some(IrcServer.connectionLostMsg)),
+                false))
             }
           }
         }
@@ -189,7 +192,7 @@ trait IrcServerComponent {
         
         case (c: Connection, q: QuitCommand) => getUser(c) { user =>
           logger.debug("Quit command from " + user)
-          deleteUser(user.reBroadcast(q))
+          deleteUser(user.reBroadcast(q, false))
         }
   
         case (c: Connection, j: JoinCommand) => getUser(c) { user =>

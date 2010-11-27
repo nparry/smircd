@@ -197,6 +197,42 @@ class IrcServerSpec extends Specification {
       c must beEmpty
     }
 
+    "tellChanMembersAboutQuits" in {
+      val c1 = connection.connect().send(
+        "NICK foo",
+        "USER blah blah blah blah",
+        "JOIN #chan")
+      val c2 = connection.connect().send(
+        "NICK bar",
+        "USER blah blah blah blah",
+        "JOIN #chan")
+
+      c2.clearBuffer()
+      c1.clearBuffer().send("QUIT :bye bye")
+
+      c1 must beDisconnected
+      c2 must haveMessageSequence(":foo QUIT :bye bye")
+      channelMembers("#chan") must beEqualTo(Set("bar"))
+    }
+
+    "tellChanMembersAboutAbruptDisconnect" in {
+      val c1 = connection.connect().send(
+        "NICK foo",
+        "USER blah blah blah blah",
+        "JOIN #chan")
+      val c2 = connection.connect().send(
+        "NICK bar",
+        "USER blah blah blah blah",
+        "JOIN #chan")
+
+      c2.clearBuffer()
+      c1.clearBuffer().disconnect()
+
+      c1 must beDisconnected
+      c2 must haveMessageSequence(":foo QUIT :" + IrcServer.connectionLostMsg)
+      channelMembers("#chan") must beEqualTo(Set("bar"))
+    }
+
   }
 
   def connectionCounts = unitTestServer.connectionStats
