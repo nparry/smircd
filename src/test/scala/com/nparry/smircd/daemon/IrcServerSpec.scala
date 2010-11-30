@@ -539,6 +539,49 @@ class IrcServerSpec extends Specification {
       c1 must haveMessageSequence(":foo KICK #chan1 bar :booted")
       c2 must haveMessageSequence(":foo KICK #chan1 bar :booted")
     }
+
+    "deliverMessagesToUsers" in {
+      val c1 = connection.connect().send(
+        "NICK foo",
+        "USER blah blah blah blah")
+      val c2 = connection.connect().send(
+        "NICK Bar",
+        "USER blah blah blah blah")
+      val c3 = connection.connect().send(
+        "NICK Baz",
+        "USER blah blah blah blah")
+
+      c2.clearBuffer()
+      c3.clearBuffer()
+      c1.clearBuffer().send("PRIVMSG bar,baz :hi there")
+
+      c1 must beEmpty
+      c2 must haveMessageSequence(":foo PRIVMSG bar,baz :hi there")
+      c3 must haveMessageSequence(":foo PRIVMSG bar,baz :hi there")
+    }
+
+    "deliverMessagesToChannels" in {
+      val c1 = connection.connect().send(
+        "NICK foo",
+        "USER blah blah blah blah",
+        "JOIN #chan1")
+      val c2 = connection.connect().send(
+        "NICK Bar",
+        "USER blah blah blah blah",
+        "JOIN #chan1")
+      val c3 = connection.connect().send(
+        "NICK Baz",
+        "USER blah blah blah blah",
+        "JOIN #chan2")
+
+      c2.clearBuffer()
+      c3.clearBuffer()
+      c1.clearBuffer().send("PRIVMSG #chan1 :hi there")
+
+      c1 must beEmpty
+      c2 must haveMessageSequence(":foo PRIVMSG #chan1 :hi there")
+      c3 must beEmpty
+    }
   }
 
   def connectionCounts = unitTestServer.connectionStats
