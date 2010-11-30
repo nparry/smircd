@@ -497,6 +497,48 @@ class IrcServerSpec extends Specification {
         (ResponseCode.RPL_LIST, List("foo", "#chan1", "2", "a topic")))
       c1 must haveReplySequence(ResponseCode.RPL_LISTEND)
     }
+
+    "updateServerStateOnKick" in {
+      val c1 = connection.connect().send(
+        "NICK foo",
+        "USER blah blah blah blah",
+        "JOIN #chan1")
+      val c2 = connection.connect().send(
+        "NICK bar",
+        "USER blah blah blah blah",
+        "JOIN #chan1,#chan2")
+
+      channelMembers("#chan1") must beEqualTo(Set("foo", "bar"))
+      channelMembers("#chan2") must beEqualTo(Set("bar"))
+      userMemberships("foo") must beEqualTo(Set("#chan1"))
+      userMemberships("bar") must beEqualTo(Set("#chan1", "#chan2"))
+
+      c1.send("KICK #chan1 bar")
+
+      channelMembers("#chan1") must beEqualTo(Set("foo"))
+      channelMembers("#chan2") must beEqualTo(Set("bar"))
+      userMemberships("foo") must beEqualTo(Set("#chan1"))
+      userMemberships("bar") must beEqualTo(Set("#chan2"))
+
+      c2 must beConnected
+    }
+
+    "tellChanMembersAboutKicks" in {
+      val c1 = connection.connect().send(
+        "NICK foo",
+        "USER blah blah blah blah",
+        "JOIN #chan1")
+      val c2 = connection.connect().send(
+        "NICK bar",
+        "USER blah blah blah blah",
+        "JOIN #chan1,#chan2")
+
+      c2.clearBuffer()
+      c1.clearBuffer().send("KICK #chan1 bar :booted")
+
+      c1 must haveMessageSequence(":foo KICK #chan1 bar :booted")
+      c2 must haveMessageSequence(":foo KICK #chan1 bar :booted")
+    }
   }
 
   def connectionCounts = unitTestServer.connectionStats
