@@ -655,6 +655,15 @@ class IrcServerSpec extends Specification {
       c2 must beDisconnected
       c3 must haveMessageSequence(":foo KILL bar :booted")
     }
+
+    "sendPongForPing" in {
+      val c = connection.connect().send(
+        "NICK foo",
+        "USER blah blah blah blah")
+
+      c.clearBuffer().send("PING")
+      c must haveMessageSequence(":unittest PONG")
+    }
   }
 
   def connectionCounts = unitTestServer.connectionStats
