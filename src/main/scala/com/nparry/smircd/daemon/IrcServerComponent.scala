@@ -138,8 +138,7 @@ trait IrcServerComponent {
               deleteUser(user.reBroadcast(SupportedCommand(
                 user.maybeNickname.map(_.name),
                 "QUIT",
-                Some(IrcServer.connectionLostMsg)),
-                false))
+                Some(IrcServer.connectionLostMsg))))
             }
           }
         }
@@ -192,7 +191,7 @@ trait IrcServerComponent {
         
         case (c: Connection, q: QuitCommand) => getUser(c) { user =>
           logger.debug("Quit command from " + user)
-          deleteUser(user.reBroadcast(q, false))
+          deleteUser(user.reBroadcast(q))
         }
   
         case (c: Connection, j: JoinCommand) => getUser(c) { user =>
@@ -262,7 +261,10 @@ trait IrcServerComponent {
           logger.debug("Kill command from " + user)
           val victim = getActiveUser(k.nickname.normalized) match {
             case None => user.returnError(ResponseCode.ERR_NOSUCHNICK, k.nickname.name)
-            case Some(u) => deleteUser(u)
+            case Some(u) => {
+              u.reBroadcast(k.copyWithNewPrefix(user.maybeNickname.map(_.name)), false)
+              deleteUser(u)
+            }
           }
         }
   

@@ -33,7 +33,7 @@ trait UserComponent {
       def kickUserFromChannel(channel: Channel, cmd: KickCommand) = notRegistered
       def messageToChannel(channel: Channel, cmd: PrivMsgCommand) = notRegistered
       def away(cmd: AwayCommand) = notRegistered
-      def reBroadcast(cmd: SupportedCommand, includeSender: Boolean) = notRegistered
+      def reBroadcast(cmd: SupportedCommand, updatePrefix: Boolean = true) = notRegistered
   
       def notRegistered(): User = returnError(ResponseCode.ERR_NOTREGISTERED)
   
@@ -141,9 +141,9 @@ trait UserComponent {
         send(cmd.copyWithNewPrefix(sender.maybeNickname.map(_.name)))
       }
   
-      def reBroadcast(cmd: SupportedCommand, includeSender: Boolean) = {
+      def reBroadcast(cmd: SupportedCommand, updatePrefix: Boolean = true) = {
         for (chan <- channels.values) {
-          chan.reBroadcastFrom(this, cmd, includeSender)
+          chan.reBroadcastFrom(this, cmd, false, updatePrefix)
         }
   
         this
@@ -178,7 +178,7 @@ trait UserComponent {
     def messageToChannel(channel: Channel, cmd: PrivMsgCommand): User;
     def away(cmd: AwayCommand): User;
   
-    def reBroadcast(cmd: SupportedCommand, includeSender: Boolean): User;
+    def reBroadcast(cmd: SupportedCommand, updatePrefix: Boolean = true): User;
   
     def returnError(rspCode: ResponseCode.Value): User = returnError(rspCode, None)
     def returnError(rspCode: ResponseCode.Value, message: String): User = returnError(rspCode, Some(message))

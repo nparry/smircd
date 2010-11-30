@@ -597,6 +597,64 @@ class IrcServerSpec extends Specification {
       c1 must beEmpty
       c2 must haveMessageSequence(":foo NOTICE bar :hi there")
     }
+
+    "disconnectKilledUser" in {
+      val c1 = connection.connect().send(
+        "NICK foo",
+        "USER blah blah blah blah",
+        "JOIN #chan1")
+      val c2 = connection.connect().send(
+        "NICK bar",
+        "USER blah blah blah blah",
+        "JOIN #chan1,#chan2")
+
+      c2.clearBuffer()
+      c1.send("KILL bar :booted")
+
+      c2 must beDisconnected
+    }
+
+    "updateServerStateOnKill" in {
+      val c1 = connection.connect().send(
+        "NICK foo",
+        "USER blah blah blah blah",
+        "JOIN #chan1")
+      val c2 = connection.connect().send(
+        "NICK bar",
+        "USER blah blah blah blah",
+        "JOIN #chan1,#chan2")
+
+      c1.send("KILL bar :booted")
+
+      nicknames must beEqualTo(Set("foo"))
+      connectionCounts must beEqualTo((0, 1))
+      channelMembers("#chan1") must beEqualTo(Set("foo"))
+      channelExists("#chan2") must beEqualTo(false)
+    }
+
+    "tellChanMembersAboutKills" in {
+      val c1 = connection.connect().send(
+        "NICK foo",
+        "USER blah blah blah blah")
+      val c2 = connection.connect().send(
+        "NICK bar",
+        "USER blah blah blah blah",
+        "JOIN #chan")
+      val c3 = connection.connect().send(
+        "NICK baz",
+        "USER blah blah blah blah",
+        "JOIN #chan")
+
+      c2.clearBuffer()
+      c3.clearBuffer()
+      c1.clearBuffer().send("KILL bar :booted")
+
+      // Not sure if this is the right msg channel members should get.
+      // Should this show up as a PART instead?
+      c1 must beEmpty
+      c2 must beDisconnected
+      c3 must haveMessageSequence(":foo KILL bar :booted")
+    }
   }
 
   def connectionCounts = unitTestServer.connectionStats

@@ -100,9 +100,10 @@ trait ChannelComponent {
       reBroadcastFrom(user, cmd, false)
     }
   
-    def reBroadcastFrom(user: User.Registered, cmd: SupportedCommand, includeSender: Boolean = true) = {
+    def reBroadcastFrom(user: User.Registered, cmd: SupportedCommand, includeSender: Boolean = true, updatePrefix: Boolean = true) = {
       logger.debug(this + " broadcasting message " + cmd + " from " + user)
-      val c = cmd.copyWithNewPrefix(user.maybeNickname.map(_.name))
+      val c = if (updatePrefix) cmd.copyWithNewPrefix(user.maybeNickname.map(_.name))
+              else cmd
       for (u <- getChannelMembers) {
         if (u != user || includeSender) u.send(c)
       }
