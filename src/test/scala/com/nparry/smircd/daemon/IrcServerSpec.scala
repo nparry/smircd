@@ -282,12 +282,57 @@ class IrcServerSpec extends Specification {
       c1 must haveMessageSequence(":bar JOIN #chan")
     }
 
+    "updateChannelStateOnParts" in {
+      val c1 = connection.connect().send(
+        "NICK foo",
+        "USER blah blah blah blah",
+        "JOIN #chan")
+      val c2 = connection.connect().send(
+        "NICK bar",
+        "USER blah blah blah blah",
+        "JOIN #chan")
+
+      channelMembers("#chan") must beEqualTo(Set("foo", "bar"))
+
+      c2.send("PART #chan")
+      channelMembers("#chan") must beEqualTo(Set("foo"))
+    }
+
+    "tellChanMembersAboutParts" in {
+      val c1 = connection.connect().send(
+        "NICK foo",
+        "USER blah blah blah blah",
+        "JOIN #chan")
+      val c2 = connection.connect().send(
+        "NICK bar",
+        "USER blah blah blah blah",
+        "JOIN #chan")
+
+      c1.clearBuffer()
+      c2.clearBuffer().send("PART #chan")
+
+      c1 must haveMessageSequence(":bar PART #chan")
+      c2 must haveMessageSequence(":bar PART #chan")
+    }
+
+    "removeChannelAfterLastMemberParts" in {
+      val c = connection.connect().send(
+        "NICK foo",
+        "USER blah blah blah blah",
+        "JOIN #chan")
+
+      channelExists("#chan") must beTrue
+      c.send("PART #chan")
+      channelExists("#chan") must beFalse
+    }
+
   }
 
   def connectionCounts = unitTestServer.connectionStats
   def nicknames = unitTestServer.currentNicks.map(_.normalized)
   def channel(name: String) = unitTestServer.getChannel(ChannelName(name))
   def channelMembers(name: String): Set[String] = channel(name).members.map(_.normalized).toSet
+  def channelExists(name: String) = unitTestServer.getDesiredChannels(List(ChannelName(name))).size != 0
 
   val beDisconnected = new Matcher[C]() {
     def apply(c: => C) = (
