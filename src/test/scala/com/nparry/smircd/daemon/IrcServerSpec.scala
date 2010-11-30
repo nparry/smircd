@@ -445,6 +445,54 @@ class IrcServerSpec extends Specification {
       c must haveReplyAndParamSequence(
         (ResponseCode.RPL_ENDOFNAMES, List("foo", "*")))
     }
+
+    "allowUserToQueryChannelInfoWithNoResult" in {
+      val c = connection.connect().send(
+        "NICK foo",
+        "USER blah blah blah blah")
+
+      c.clearBuffer().send("LIST")
+      c must haveReplySequence(
+        ResponseCode.RPL_LISTSTART,
+        ResponseCode.RPL_LISTEND)
+    }
+
+    "allowUserToQueryAllChannelInfo" in {
+      val c1 = connection.connect().send(
+        "NICK foo",
+        "USER blah blah blah blah",
+        "JOIN #chan1",
+        "TOPIC #chan1 :a topic")
+      val c2 = connection.connect().send(
+        "NICK bar",
+        "USER blah blah blah blah",
+        "JOIN #chan1,#chan2")
+
+      c1.clearBuffer().send("LIST")
+      c1 must haveReplySequence(ResponseCode.RPL_LISTSTART)
+      c1 must haveReplyAndParamSequence(
+        (ResponseCode.RPL_LIST, List("foo", "#chan1", "2", "a topic")),
+        (ResponseCode.RPL_LIST, List("foo", "#chan2", "1", "")))
+      c1 must haveReplySequence(ResponseCode.RPL_LISTEND)
+    }
+
+    "allowUserToQuerySingleChannelInfo" in {
+      val c1 = connection.connect().send(
+        "NICK foo",
+        "USER blah blah blah blah",
+        "JOIN #chan1",
+        "TOPIC #chan1 :a topic")
+      val c2 = connection.connect().send(
+        "NICK bar",
+        "USER blah blah blah blah",
+        "JOIN #chan1,#chan2")
+
+      c1.clearBuffer().send("LIST #chan1")
+      c1 must haveReplySequence(ResponseCode.RPL_LISTSTART)
+      c1 must haveReplyAndParamSequence(
+        (ResponseCode.RPL_LIST, List("foo", "#chan1", "2", "a topic")))
+      c1 must haveReplySequence(ResponseCode.RPL_LISTEND)
+    }
   }
 
   def connectionCounts = unitTestServer.connectionStats
