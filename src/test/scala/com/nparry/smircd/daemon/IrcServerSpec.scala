@@ -377,6 +377,74 @@ class IrcServerSpec extends Specification {
       c must haveReplyAndParamSequence(
         (ResponseCode.RPL_TOPIC, List("foo", "#chan", "a topic")))
     }
+
+    "allowUserToQueryNamesWithNoResult" in {
+      val c = connection.connect().send(
+        "NICK foo",
+        "USER blah blah blah blah")
+
+      c.clearBuffer().send("NAMES")
+
+      c must haveReplyAndParamSequence(
+        (ResponseCode.RPL_ENDOFNAMES, List("foo", "*")))
+    }
+
+    "allowUserToQueryNamesForAllChannels" in {
+      val c1 = connection.connect().send(
+        "NICK foo",
+        "USER blah blah blah blah",
+        "JOIN #chan1,#chan2")
+      val c2 = connection.connect().send(
+        "NICK bar",
+        "USER blah blah blah blah",
+        "JOIN #chan1,#chan3")
+
+      c1.clearBuffer().send("NAMES")
+
+      c1 must haveReplyAndParamSequence(
+        (ResponseCode.RPL_NAMREPLY, List("foo", "=", "#chan1", "bar foo")),
+        (ResponseCode.RPL_NAMREPLY, List("foo", "=", "#chan2", "foo")),
+        (ResponseCode.RPL_NAMREPLY, List("foo", "=", "#chan3", "bar")),
+        (ResponseCode.RPL_ENDOFNAMES, List("foo", "*")))
+    }
+
+    "allowUserToQueryNamesForSingleChannel" in {
+      val c = connection.connect().send(
+        "NICK foo",
+        "USER blah blah blah blah",
+        "JOIN #chan1,#chan2")
+
+      c.clearBuffer().send("NAMES #chan2")
+
+      c must haveReplyAndParamSequence(
+        (ResponseCode.RPL_NAMREPLY, List("foo", "=", "#chan2", "foo")),
+        (ResponseCode.RPL_ENDOFNAMES, List("foo", "*")))
+    }
+
+    "allowUserToQueryNamesForMultipleChannel" in {
+      val c = connection.connect().send(
+        "NICK foo",
+        "USER blah blah blah blah",
+        "JOIN #chan1,#chan2")
+
+      c.clearBuffer().send("NAMES #chan2,#chan1")
+
+      c must haveReplyAndParamSequence(
+        (ResponseCode.RPL_NAMREPLY, List("foo", "=", "#chan1", "foo")),
+        (ResponseCode.RPL_NAMREPLY, List("foo", "=", "#chan2", "foo")),
+        (ResponseCode.RPL_ENDOFNAMES, List("foo", "*")))
+    }
+
+    "ignoreUnknownChannelsInNameQueries" in {
+      val c = connection.connect().send(
+        "NICK foo",
+        "USER blah blah blah blah")
+
+      c.clearBuffer().send("NAMES #bogus")
+
+      c must haveReplyAndParamSequence(
+        (ResponseCode.RPL_ENDOFNAMES, List("foo", "*")))
+    }
   }
 
   def connectionCounts = unitTestServer.connectionStats
