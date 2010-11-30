@@ -271,6 +271,7 @@ class IrcServerSpec extends Specification {
         "JOIN #chan")
 
       channelMembers("#chan") must beEqualTo(Set("foo"))
+      userMemberships("foo") must beEqualTo(Set("#chan"))
 
       c1.clearBuffer()
       val c2 = connection.connect().send(
@@ -279,6 +280,7 @@ class IrcServerSpec extends Specification {
         "JOIN #chan")
 
       channelMembers("#chan") must beEqualTo(Set("foo", "bar"))
+      userMemberships("bar") must beEqualTo(Set("#chan"))
       c1 must haveMessageSequence(":bar JOIN #chan")
     }
 
@@ -293,9 +295,11 @@ class IrcServerSpec extends Specification {
         "JOIN #chan")
 
       channelMembers("#chan") must beEqualTo(Set("foo", "bar"))
+      userMemberships("bar") must beEqualTo(Set("#chan"))
 
       c2.send("PART #chan")
       channelMembers("#chan") must beEqualTo(Set("foo"))
+      userMemberships("bar") must beEqualTo(Set())
     }
 
     "tellChanMembersAboutParts" in {
@@ -498,8 +502,13 @@ class IrcServerSpec extends Specification {
   def connectionCounts = unitTestServer.connectionStats
   def nicknames = unitTestServer.currentNicks.map(_.normalized)
   def channel(name: String) = unitTestServer.getChannel(ChannelName(name))
-  def channelMembers(name: String): Set[String] = channel(name).members.map(_.normalized).toSet
-  def channelExists(name: String) = unitTestServer.getDesiredChannels(List(ChannelName(name))).size != 0
+  def channelMembers(name: String): Set[String] =
+    channel(name).members.map(_.normalized).toSet
+  def channelExists(name: String) =
+    unitTestServer.getDesiredChannels(List(ChannelName(name))).size != 0
+  def userMemberships(name: String) =
+    unitTestServer.getActiveUser(NickName(name).normalized)
+      .map(_.channels.keySet.map(_.name)).getOrElse(Set())
 
   val beDisconnected = new Matcher[C]() {
     def apply(c: => C) = (
