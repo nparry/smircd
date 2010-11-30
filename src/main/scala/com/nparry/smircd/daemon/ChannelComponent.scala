@@ -74,8 +74,8 @@ trait ChannelComponent {
   
     def sendTopicTo(user: User): User = {
       topic match {
-        case None => user.reply(ResponseCode.RPL_NOTOPIC)
-        case Some(t) => user.reply(ResponseCode.RPL_TOPIC, List(t))
+        case None => user.reply(ResponseCode.RPL_NOTOPIC, List(name.name))
+        case Some(t) => user.reply(ResponseCode.RPL_TOPIC, List(name.name, t))
       }
     }
   

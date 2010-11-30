@@ -240,8 +240,8 @@ class IrcServerSpec extends Specification {
       c.clearBuffer().send("JOIN #chan")
 
       c must haveMessageSequence(":foo JOIN #chan")
-      c must haveReplySequence(ResponseCode.RPL_NOTOPIC)
       c must haveReplyAndParamSequence(
+        (ResponseCode.RPL_NOTOPIC, List("foo", "#chan")),
         (ResponseCode.RPL_NAMREPLY, List("foo", "=", "#chan", "foo")))
       c must haveReplySequence(ResponseCode.RPL_ENDOFNAMES)
     }
@@ -326,6 +326,57 @@ class IrcServerSpec extends Specification {
       channelExists("#chan") must beFalse
     }
 
+    "sendTopicToNewChanMembers" in {
+      val c1 = connection.connect().send(
+        "NICK foo",
+        "USER blah blah blah blah",
+        "JOIN #chan",
+        "TOPIC #chan :a topic")
+
+      val c2 = connection.connect().send(
+        "NICK bar",
+        "USER blah blah blah blah")
+      c2.clearBuffer().send("JOIN #chan")
+
+      c2 must haveMessageSequence(":bar JOIN #chan")
+      c2 must haveReplyAndParamSequence(
+        (ResponseCode.RPL_TOPIC, List("bar", "#chan", "a topic")))
+    }
+
+    "tellChanMembersAboutNewTopics" in {
+      val c1 = connection.connect().send(
+        "NICK foo",
+        "USER blah blah blah blah",
+        "JOIN #chan")
+
+      val c2 = connection.connect().send(
+        "NICK bar",
+        "USER blah blah blah blah",
+        "JOIN #chan")
+
+      c1.clearBuffer()
+      c2.clearBuffer().send("TOPIC #chan :a topic")
+
+      c1 must haveMessageSequence(":bar TOPIC #chan :a topic")
+      c2 must haveMessageSequence(":bar TOPIC #chan :a topic")
+    }
+
+    "allowUserToQueryTopic" in {
+      val c = connection.connect().send(
+        "NICK foo",
+        "USER blah blah blah blah",
+        "JOIN #chan")
+
+      c.clearBuffer().send("TOPIC #chan")
+      c must haveReplyAndParamSequence(
+        (ResponseCode.RPL_NOTOPIC, List("foo", "#chan")))
+
+      c.send("TOPIC #chan :a topic")
+
+      c.clearBuffer().send("TOPIC #chan")
+      c must haveReplyAndParamSequence(
+        (ResponseCode.RPL_TOPIC, List("foo", "#chan", "a topic")))
+    }
   }
 
   def connectionCounts = unitTestServer.connectionStats
