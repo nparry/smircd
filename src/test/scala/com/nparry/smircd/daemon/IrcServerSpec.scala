@@ -664,6 +664,59 @@ class IrcServerSpec extends Specification {
       c.clearBuffer().send("PING")
       c must haveMessageSequence(":unittest PONG")
     }
+
+    "deliverAwayMessageWhenUserGetsAMessage" in {
+      val c1 = connection.connect().send(
+        "NICK foo",
+        "USER blah blah blah blah")
+      val c2 = connection.connect().send(
+        "NICK bar",
+        "USER blah blah blah blah")
+
+      c1.clearBuffer.send("PRIVMSG bar :hi there")
+      c1 must beEmpty
+
+      c2.clearBuffer.send("AWAY :gone")
+      c2 must haveReplySequence(ResponseCode.RPL_NOWAWAY)
+
+      c1.clearBuffer.send("PRIVMSG bar :hi there")
+      c1 must haveReplyAndParamSequence(
+        (ResponseCode.RPL_AWAY, List("foo", "bar", "gone")))
+
+      c2.clearBuffer.send("AWAY")
+      c2 must haveReplySequence(ResponseCode.RPL_UNAWAY)
+
+      c1.clearBuffer.send("PRIVMSG bar :hi there")
+      c1 must beEmpty
+    }
+
+    "ignoreAwayMessagesWhenUserGetsANotice" in {
+      val c1 = connection.connect().send(
+        "NICK foo",
+        "USER blah blah blah blah")
+      val c2 = connection.connect().send(
+        "NICK bar",
+        "USER blah blah blah blah",
+        "AWAY :gone")
+
+      c1.clearBuffer.send("NOTICE bar :hi there")
+      c1 must beEmpty
+    }
+
+    "ignoreAwayMessagesWhenUserGetsAMessageViaAChannel" in {
+      val c1 = connection.connect().send(
+        "NICK foo",
+        "USER blah blah blah blah",
+        "JOIN #chan")
+      val c2 = connection.connect().send(
+        "NICK bar",
+        "USER blah blah blah blah",
+        "JOIN #chan",
+        "AWAY :gone")
+
+      c1.clearBuffer.send("PRIVMSG #chan :hi there")
+      c1 must beEmpty
+    }
   }
 
   def connectionCounts = unitTestServer.connectionStats
