@@ -6,7 +6,27 @@ import com.nparry.smircd.daemon.IrcServer
 
 import org.jboss.netty.logging._
 
-class Mainline {
+object Mainline {
+  def main(args: Array[String]) {
+    if (args.length < 1) {
+      println("Usage: java -jar <jar> <port>")
+      return
+    }
+
+    val port = args(0).toInt
+    val m = new Mainline(port)
+    m.start()
+    Runtime.getRuntime().addShutdownHook(new Thread() { override def run {
+      m.stop
+    }})
+
+    synchronized {
+      wait()
+    }
+  }
+}
+
+class Mainline(port: Int) {
   InternalLoggerFactory.setDefaultFactory(new Slf4JLoggerFactory())
 
   var netty: Option[NettyServer] = None
@@ -33,7 +53,7 @@ class Mainline {
   }
 
   def makeNetty = {
-    new NettyServer(daemon.get, 8080)
+    new NettyServer(daemon.get, port)
   }
 
 }
