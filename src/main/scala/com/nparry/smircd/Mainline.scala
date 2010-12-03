@@ -6,11 +6,23 @@ import com.nparry.smircd.daemon.IrcServer
 
 import org.jboss.netty.logging._
 
+import ch.qos.logback.classic.Logger
+import ch.qos.logback.classic.Level
+
 object Mainline {
   def main(args: Array[String]) {
     if (args.length < 1) {
-      println("Usage: java -jar <jar> <port>")
+      println("Usage: java -jar <jar> <port> [<log level>]")
       return
+    }
+
+    val level =
+      if (args.length > 1) args(1)
+      else "INFO"
+
+    org.slf4j.LoggerFactory.getLogger(org.slf4j.Logger.ROOT_LOGGER_NAME) match {
+      case l: Logger => l.setLevel(Level.toLevel(level))
+      case default => System.err.println("Unable to set logging level")
     }
 
     val port = args(0).toInt
