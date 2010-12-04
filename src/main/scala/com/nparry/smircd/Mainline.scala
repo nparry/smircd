@@ -10,30 +10,51 @@ import ch.qos.logback.classic.Logger
 import ch.qos.logback.classic.Level
 
 object Mainline {
-  def main(args: Array[String]) {
-    if (args.length < 1) {
-      println("Usage: java -jar <jar> <port> [<log level>]")
-      return
-    }
+  case class Args(
+    port: Int = 6667,
+    logLevel: String = "INFO",
+    inSbt: Boolean = false)
 
-    val level =
-      if (args.length > 1) args(1)
-      else "INFO"
+  def processArgs(current: Args, args: List[String]): Args = {
+    args match {
+      case "--port" :: port :: rest => processArgs(current.copy(port=port.toInt), rest)
+      case "--logLevel" :: level :: rest => processArgs(current.copy(logLevel=level), rest)
+      case "--inSbt" :: rest => processArgs(current.copy(inSbt=true), rest)
+      case unknown :: rest => {
+        System.err.println("Unknown argument: " + unknown)
+        processArgs(current, rest)
+
+      }
+      case Nil => current
+    }
+  }
+
+  def apply(args: String = "") = main(("--inSbt " + args).trim().split(" "))
+
+  def main(args: Array[String]) {
+    val arguments = processArgs(Args(), args.toList)
 
     org.slf4j.LoggerFactory.getLogger(org.slf4j.Logger.ROOT_LOGGER_NAME) match {
-      case l: Logger => l.setLevel(Level.toLevel(level))
+      case l: Logger => l.setLevel(Level.toLevel(arguments.logLevel))
       case default => System.err.println("Unable to set logging level")
     }
 
-    val port = args(0).toInt
-    val m = new Mainline(port)
+    val m = new Mainline(arguments.port)
     m.start()
-    Runtime.getRuntime().addShutdownHook(new Thread() { override def run {
-      m.stop
-    }})
 
-    synchronized {
-      wait()
+    if (arguments.inSbt) {
+      Console.readLine("Press enter to quit...\n")
+      m.stop
+    }
+    else {
+      Runtime.getRuntime().addShutdownHook(new Thread() { override def run {
+        m.stop
+      }})
+
+      // Block until ^C
+      synchronized {
+        wait()
+      }
     }
   }
 }
