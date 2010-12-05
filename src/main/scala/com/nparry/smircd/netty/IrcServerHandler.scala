@@ -17,22 +17,30 @@ class IrcServerHandler(ircServer: Daemon, channels: ChannelGroup) extends Simple
   
   var actor: Option[Actor] = None
 
-  override def channelOpen(ctx: ChannelHandlerContext, e: ChannelStateEvent) = {
+  def withActor(e: ChannelEvent, forceCreation: Boolean = true)(fn: (Actor) => Unit) = {
+    actor.orElse({
+      if (!forceCreation)
+        None
+      else
+        createAndStartActor(e)
+    }).map(fn)
+  }
+
+  def createAndStartActor(e: ChannelEvent) = {
     logger.debug("Channel open for " + this)
     channels.add(e.getChannel)
-  }
-  
-  override def channelConnected(ctx: ChannelHandlerContext, e: ChannelStateEvent) = {
     actor = Some(new ConnectionActor(e.getChannel(), ircServer))
     for (a <- actor) {
       a.start()
       a ! true
     }
-  }
 
+    actor
+  }
+  
   override def channelClosed(ctx: ChannelHandlerContext, e: ChannelStateEvent) = {
     logger.debug("Channel closed for " + this)
-    for (a <- actor) {
+    withActor(e, false) { a =>
       a ! false
     }
 
@@ -40,15 +48,15 @@ class IrcServerHandler(ircServer: Daemon, channels: ChannelGroup) extends Simple
   }
 
   override def messageReceived(ctx: ChannelHandlerContext, e: MessageEvent) = {
-    logger.trace("Channel received " + e.getMessage())
-    for (a <- actor) {
+    withActor(e) { a =>
+      logger.trace("Channel received " + e.getMessage())
       a ! e.getMessage()
     }
   }
   
   override def exceptionCaught(ctx: ChannelHandlerContext, e: ExceptionEvent) = {
-    logger.warn("Channel caught exception " + e.getCause())
-    for (a <- actor) {
+    withActor(e) { a =>
+      logger.warn("Channel caught exception " + e.getCause())
       a ! false
     }
   }
