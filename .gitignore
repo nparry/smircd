@@ -1,4 +1,5 @@
 lib_managed
+src_managed
 target
 *.jar
 *.lock
