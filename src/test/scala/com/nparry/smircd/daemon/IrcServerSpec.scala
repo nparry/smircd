@@ -10,8 +10,15 @@ import org.specs.matcher.Matcher
 
 class IrcServerSpec extends Specification {
 
-  val unitTestServer = Server()
+  var unitTestServer = makeServer()
+
   def connection = C(unitTestServer)
+  def makeServer(ping: Int = 1, drop: Int = 5) = {
+    (new Server() {
+        val dropThresholdMinutes = drop
+        val pingThresholdMinutes = ping
+    })()
+  }
 
   "IrcServer" should {
 
@@ -717,6 +724,42 @@ class IrcServerSpec extends Specification {
       c1.clearBuffer.send("PRIVMSG #chan :hi there")
       c1 must beEmpty
     }
+
+    "pingConnectionsIdlePastPingThreshold" in {
+      // Dumb trick: Negative ping value bumps ping threshold
+      // into the future, thus we can force a situation where a
+      // ping should happen.
+      unitTestServer = makeServer(ping = -10)
+
+      val c = connection.connect().send(
+        "NICK foo",
+        "USER blah blah blah blah")
+
+      connectionCounts mustEqual (0, 1)
+
+      c.clearBuffer()
+      unitTestServer.processIncomingMsg(IrcServer.PingEm())
+
+      connectionCounts mustEqual (0, 1)
+      c must haveMessageSequence(":unittest PING")
+    }
+
+    "dropConnectionsIdlePastDropThreshold" in {
+      // Same dumb trick as the previous test
+      unitTestServer = makeServer(drop = -10)
+
+      val c = connection.connect().send(
+        "NICK foo",
+        "USER blah blah blah blah")
+
+      connectionCounts mustEqual (0, 1)
+
+      c.clearBuffer()
+      unitTestServer.processIncomingMsg(IrcServer.PingEm())
+
+      connectionCounts mustEqual (0, 0)
+      c must beDisconnected
+    }
   }
 
   def connectionCounts = unitTestServer.connectionStats
@@ -818,10 +861,10 @@ class IrcServerSpec extends Specification {
 
   object C {
     val counter = new java.util.concurrent.atomic.AtomicInteger(0)
-    def apply(s: Server.IrcServer) = new C(counter.getAndIncrement(), s)
+    def apply(s: Server#IrcServer) = new C(counter.getAndIncrement(), s)
   }
 
-  class C(val id: Int, val server: Server.IrcServer) {
+  class C(val id: Int, val server: Server#IrcServer) {
     val buffer: Queue[Any] = Queue()
 
     override def hashCode() = id.hashCode()
@@ -845,7 +888,7 @@ class IrcServerSpec extends Specification {
     }
   }
 
-  object Server extends ConnectionComponent
+  trait Server extends ConnectionComponent
     with IrcServerComponent
     with ChannelComponent
     with UserComponent

@@ -12,6 +12,7 @@ import grizzled.slf4j.Logger
 object IrcServer {
   case class OutboundMessage(cmd: SupportedCommand)
   case class Shutdown()
+  case class PingEm()
 
   val connectionLostMsg = "Connection lost"
 }
@@ -19,6 +20,9 @@ object IrcServer {
 trait IrcServerComponent {
 
   this: ConnectionComponent with UserComponent with ChannelComponent =>
+
+  def pingThresholdMinutes: Int
+  def dropThresholdMinutes: Int
 
   class IrcServer(serverId: String, quit: () => Unit) {
     val logger = Logger(this.getClass())
@@ -48,8 +52,11 @@ trait IrcServerComponent {
       }
     }
   
-    def getUser[R](c: Connection)(useUser: (User) => R): Option[R] = {
-      lastSeen.put(c, new Date())
+    def getUser[R](c: Connection, updateLastSeen: Boolean = true)(useUser: (User) => R): Option[R] = {
+      if (updateLastSeen) {
+        lastSeen.put(c, new Date())
+      }
+
       activeConnections.get(c).orElse(pendingConnections.get(c)).map { u =>
         logger.trace("Using user " + u)
         useUser(u) 
@@ -125,6 +132,42 @@ trait IrcServerComponent {
           }
   
           quit()
+        }
+
+        case IrcServer.PingEm() => {
+          def previousTime(minutes: Int): Date = {
+            import java.util.Calendar
+            val cal = Calendar.getInstance()
+            cal.add(Calendar.MINUTE, -1 * minutes)
+            cal.getTime()
+          }
+
+          logger.debug("Pinging connections")
+          val pingThreshold = previousTime(pingThresholdMinutes)
+          val dropThreshold = previousTime(dropThresholdMinutes)
+          val (toDrop, toPing) = lastSeen.foldLeft((List[Connection](), List[Connection]())) {
+            case ((toDrop, toPing), (connection, lastActivity)) =>
+              if (lastActivity.before(dropThreshold))
+                (connection :: toDrop, toPing)
+              else if (lastActivity.before(pingThreshold))
+                (toDrop, connection :: toPing)
+              else
+                (toDrop, toPing)
+          }
+
+          toDrop.foreach { getUser(_) { user =>
+            // TODO: Duplicate code in the disconnect case below
+            logger.debug("Dropping connection to " + user)
+            deleteUser(user.reBroadcast(SupportedCommand(
+              user.maybeNickname.map(_.name),
+              "QUIT",
+              Some(IrcServer.connectionLostMsg))))
+          }}
+
+          toPing.foreach { getUser(_, false) { user =>
+            logger.debug("Pinging " + user)
+            user.send(SupportedCommand(serverId, "PING", List()))
+          }}
         }
   
         case (c: Connection, joining: Boolean) => {
