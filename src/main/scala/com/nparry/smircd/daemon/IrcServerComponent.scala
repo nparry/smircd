@@ -158,15 +158,24 @@ trait IrcServerComponent {
           toDrop.foreach { getUser(_) { user =>
             // TODO: Duplicate code in the disconnect case below
             logger.debug("Dropping connection to " + user)
-            deleteUser(user.reBroadcast(SupportedCommand(
-              user.maybeNickname.map(_.name),
-              "QUIT",
-              Some(IrcServer.connectionLostMsg))))
+            if (user.isRegistered) {
+              user.reBroadcast(SupportedCommand(
+                user.maybeNickname.map(_.name),
+                "QUIT",
+                Some(IrcServer.connectionLostMsg)))
+            }
+
+            deleteUser(user)
           }}
 
           toPing.foreach { getUser(_, false) { user =>
-            logger.debug("Pinging " + user)
-            user.send(SupportedCommand(serverId, "PING", List()))
+            if (user.isRegistered) {
+              logger.debug("Pinging " + user)
+              user.send(SupportedCommand(serverId, "PING", List()))
+            }
+            else {
+              logger.debug("Skipping ping for " + user)
+            }
           }}
         }
   
@@ -174,6 +183,7 @@ trait IrcServerComponent {
           if (joining) {
             logger.debug("New user joining")
             updateConnection(User.Pending(c, serverId))
+            lastSeen.put(c, new Date())
           }
           else {
             getUser(c) { user =>

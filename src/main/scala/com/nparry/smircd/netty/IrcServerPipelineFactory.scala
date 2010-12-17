@@ -22,7 +22,7 @@ class IrcServerPipelineFactory(ircServer: Daemon, channels: ChannelGroup) extend
   lazy val sslContext = Some(new SslHelper().createSslContext())
   val utf8 = Charset.forName("UTF-8")
 
-  def setupIrcInPipeline(pipeline: ChannelPipeline) = {
+  def setupIrcInPipeline(ircHandler: IrcServerHandler, pipeline: ChannelPipeline) = {
     pipeline.addLast("framer", new DelimiterBasedFrameDecoder(
       512, Delimiters.lineDelimiter(): _*))
 
@@ -32,17 +32,27 @@ class IrcServerPipelineFactory(ircServer: Daemon, channels: ChannelGroup) extend
     pipeline.addLast("destringify", new StringEncoder(utf8));
     pipeline.addLast("commandEncoder", new CommandEncoder())
 
-    pipeline.addLast("handler", new IrcServerHandler(ircServer, channels))
+    pipeline.addLast("handler", ircHandler)
   }
 
   override def getPipeline(): ChannelPipeline = {
     val pipeline = Channels.pipeline()
-    pipeline.addLast("multiplexer", new ProtocolMultiplexer())
+    val ircHandler = new IrcServerHandler(ircServer, channels)
+    pipeline.addLast("multiplexer", new ProtocolMultiplexer(ircHandler))
     pipeline
   }
 
   // Based on http://docs.jboss.org/netty/3.2/xref/org/jboss/netty/example/portunification/package-summary.html
-  class ProtocolMultiplexer extends FrameDecoder {
+  class ProtocolMultiplexer(ircHandler: IrcServerHandler) extends FrameDecoder {
+
+    // Just delegate these - the handler will eventually be installed in the
+    // pipeline once the multiplexer is done
+    override def channelOpen(ctx: ChannelHandlerContext, e: ChannelStateEvent) =
+      ircHandler.channelOpen(ctx, e)
+    override def channelClosed(ctx: ChannelHandlerContext, e: ChannelStateEvent) =
+      ircHandler.channelClosed(ctx, e)
+    override def exceptionCaught(ctx: ChannelHandlerContext, e: ExceptionEvent) =
+      ircHandler.exceptionCaught(ctx, e)
 
     override def decode(ctx: ChannelHandlerContext, channel: Channel, buffer: ChannelBuffer): Object = {
       if (buffer.readableBytes() < 2) {
@@ -60,7 +70,7 @@ class IrcServerPipelineFactory(ircServer: Daemon, channels: ChannelGroup) extend
         logger.debug("Connection from " + channel.getRemoteAddress())
       }
 
-      setupIrcInPipeline(ctx.getPipeline())
+      setupIrcInPipeline(ircHandler, ctx.getPipeline())
 
       ctx.getPipeline().remove(this)
 

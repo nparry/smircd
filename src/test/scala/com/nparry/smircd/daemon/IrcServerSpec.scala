@@ -36,6 +36,14 @@ class IrcServerSpec extends Specification {
 
     }
 
+    "handleImmediateDisconnect" in {
+      val c = connection.connect()
+
+      connectionCounts mustEqual (1, 0)
+      c.disconnect
+      connectionCounts mustEqual (0, 0)
+    }
+
     "supportNickNameChanges" in {
       val c = connection.connect().send("NICK foo")
       c must ownNickName("foo")
@@ -759,6 +767,36 @@ class IrcServerSpec extends Specification {
 
       connectionCounts mustEqual (0, 0)
       c must beDisconnected
+    }
+
+    "dropZombieConnections" in {
+      // If someone opens a socket but never sends any data, drop em!
+      unitTestServer = makeServer(drop = -10)
+
+      val c = connection.connect()
+
+      connectionCounts mustEqual (1, 0)
+
+      unitTestServer.processIncomingMsg(IrcServer.PingEm())
+
+      connectionCounts mustEqual (0, 0)
+      c must beDisconnected
+    }
+
+    "avoidPingingZombieConnections" in {
+      // Time will tell if this is what we want - don't bother to
+      // ping zombies, just leave them alone until the drop kicks in
+      unitTestServer = makeServer(ping = -10)
+
+      val c = connection.connect()
+
+      connectionCounts mustEqual (1, 0)
+
+      unitTestServer.processIncomingMsg(IrcServer.PingEm())
+
+      connectionCounts mustEqual (1, 0)
+      c must beConnected
+      c must beEmpty
     }
   }
 

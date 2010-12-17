@@ -17,30 +17,23 @@ class IrcServerHandler(ircServer: Daemon, channels: ChannelGroup) extends Simple
   
   var actor: Option[Actor] = None
 
-  def withActor(e: ChannelEvent, forceCreation: Boolean = true)(fn: (Actor) => Unit) = {
-    actor.orElse({
-      if (!forceCreation)
-        None
-      else
-        createAndStartActor(e)
-    }).map(fn)
+  def withActor(e: ChannelEvent)(fn: (Actor) => Unit) = {
+    actor.map(fn)
   }
 
-  def createAndStartActor(e: ChannelEvent) = {
-    logger.debug("Channel open for " + this)
+  override def channelOpen(ctx: ChannelHandlerContext, e: ChannelStateEvent) = {
+    logger.debug("Channel open for " + e.getChannel)
     channels.add(e.getChannel)
     actor = Some(new ConnectionActor(e.getChannel(), ircServer))
     for (a <- actor) {
       a.start()
       a ! true
     }
-
-    actor
   }
   
   override def channelClosed(ctx: ChannelHandlerContext, e: ChannelStateEvent) = {
     logger.debug("Channel closed for " + this)
-    withActor(e, false) { a =>
+    withActor(e) { a =>
       a ! false
     }
 
