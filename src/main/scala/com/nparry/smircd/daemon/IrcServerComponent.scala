@@ -145,17 +145,17 @@ trait IrcServerComponent {
           logger.debug("Pinging connections")
           val pingThreshold = previousTime(pingThresholdMinutes)
           val dropThreshold = previousTime(dropThresholdMinutes)
-          val (toDrop, toPing) = lastSeen.foldLeft((List[Connection](), List[Connection]())) {
-            case ((toDrop, toPing), (connection, lastActivity)) =>
-              if (lastActivity.before(dropThreshold))
-                (connection :: toDrop, toPing)
-              else if (lastActivity.before(pingThreshold))
-                (toDrop, connection :: toPing)
-              else
-                (toDrop, toPing)
-          }
+          val ignore = new Date()
+          val grouped = lastSeen.groupBy({ case (connection, lastActivity) =>
+            if (lastActivity.before(dropThreshold))
+              dropThreshold
+            else if (lastActivity.before(pingThreshold))
+              pingThreshold
+            else
+              ignore
+          })
 
-          toDrop.foreach { getUser(_) { user =>
+          grouped.get(dropThreshold).foreach(_.keySet.foreach { getUser(_) { user =>
             // TODO: Duplicate code in the disconnect case below
             logger.debug("Dropping connection to " + user)
             if (user.isRegistered) {
@@ -166,9 +166,9 @@ trait IrcServerComponent {
             }
 
             deleteUser(user)
-          }}
+          }})
 
-          toPing.foreach { getUser(_, false) { user =>
+          grouped.get(pingThreshold).foreach(_.keySet.foreach { getUser(_) { user =>
             if (user.isRegistered) {
               logger.debug("Pinging " + user)
               user.send(SupportedCommand(serverId, "PING", List()))
@@ -176,7 +176,7 @@ trait IrcServerComponent {
             else {
               logger.debug("Skipping ping for " + user)
             }
-          }}
+          }})
         }
   
         case (c: Connection, joining: Boolean) => {
