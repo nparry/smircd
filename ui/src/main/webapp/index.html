@@ -19,7 +19,7 @@
         padding: 0 0.25em 0 0.25em;
         overflow: auto;
       }
-      
+
       body > div:first-child, body > div:last-of-type {
         height: 2em;
         line-height: 2em;
@@ -147,7 +147,7 @@
       <!--
       <h3>nparry</h3>
       <p>hello everyone! how are we going today?  Good I hope.  The idea is that this block should make a nice border with the nice name 'column' which will we be faking</p>
-      
+
       <h3>someone</h3>
       <p>Cool, I hope this actually works!  What happens if we stretch this line so it wraps - will it then do what we want</p>
 
@@ -174,6 +174,68 @@
         <input type="text" autofocus placeholder="Enter a command then press enter...">
       </form>
     </div>
+    <script>
+      // Simple JavaScript Templating
+      // John Resig - http://ejohn.org/ - MIT Licensed
+      (function(){
+        var cache = {};
+
+        this.tmpl = function tmpl(str, data){
+          // Figure out if we're getting a template, or if we need to
+          // load the template - and be sure to cache the result.
+          var fn = !/\W/.test(str) ?
+            cache[str] = cache[str] ||
+              tmpl(document.getElementById(str).innerHTML) :
+
+            // Generate a reusable function that will serve as a template
+            // generator (and which will be cached).
+            new Function("obj",
+              "var p=[],print=function(){p.push.apply(p,arguments);};" +
+
+              // Introduce the data as local variables using with(){}
+              "with(obj){p.push('" +
+
+              // Convert the template into pure JavaScript
+              str
+                .replace(/[\r\t\n]/g, " ")
+                .split("<%").join("\t")
+                .replace(/((^|%>)[^\t]*)'/g, "$1\r")
+                .replace(/\t=(.*?)%>/g, "',$1,'")
+                .split("\t").join("');")
+                .split("%>").join("p.push('")
+                .split("\r").join("\\'")
+            + "');}return p.join('');");
+
+          // Provide some basic currying to the user
+          return data ? fn( data ) : fn;
+        };
+      })();
+    </script>
+
+    <script type="text/html" id="systemMsgTmpl">
+      <div class="systemMsg"><%= msg %></div>
+    </script>
+
+    <script type="text/html" id="errorMsgTmpl">
+      <p class="error"><%= msg %></p>
+    </script>
+
+    <script type="text/html" id="commandHelpTmpl">
+      <h2>SmIRCd Client Help: <%= cmdName %> command</h2>
+      <p>Usage: /<%= cmdName %> <%= usage %></p>
+      <p><%= detailed %></p>
+    </script>
+
+    <script type="text/html" id="helpTmpl">
+      <h2>SmIRCd Client Help</h2>
+      <p>Use /HELP [command] to get more information about a specific command</p>
+      <table>
+        <% $.each(cmds, function(key, value) { %>
+          <tr><td><%= key %></td><td><%= value.help.quick %></td></tr>
+          <% }); %>
+      </table>
+    </script>
+
     <script>
       var splitToken = function(s) {
         if (!s) {
@@ -203,11 +265,11 @@
 
         return {
           system: function(msg) {
-            _publishMsg("system", '<div class="systemMsg">' + msg + '</div>');
+            _publishMsg("system", tmpl("systemMsgTmpl", { msg: msg }));
           },
 
           error: function(msg) {
-            _publishMsg("error", '<p class="error">' + msg + '</p>');
+            _publishMsg("error", tmpl("errorMsgTmpl", { msg: msg }));
           }
         };
       })();
@@ -220,13 +282,10 @@
             function(input) {
               var cmd = firstToken(input);
               if (cmd) {
-                console.log("Showing help for " + cmd);
                 var fn = cmds[cmd.toUpperCase()];
                 if (fn) {
-                  publishMsg.system(
-                    "<h2>SmIRCd Client Help: " + fn.cmdName + " command</h2>\n" +
-                    "<p>Usage: /" + fn.cmdName + " " + fn.help.usage + "</p>\n" +
-                    "<p>" + fn.help.detailed + "</p>");
+                  console.log("Showing help for " + cmd);
+                  publishMsg.system(tmpl("commandHelpTmpl", fn.help));
                 }
                 else {
                   console.log("Help requested for invalid command " + cmd);
@@ -235,25 +294,19 @@
               }
               else {
                 console.log("Showing help");
-                var msg = "<h2>SmIRCd Client Help</h2>\n" +
-                 "<p>Use /HELP [command] to get more information about a specific command</p>\n<table>\n";
-                $.each(cmds, function(key, value) {
-                  msg += "<tr><td>" + key + "</td><td>" + value.help.quick + "</td></tr>\n";
-                });
-                msg += "</table>";
-                publishMsg.system(msg);
+                publishMsg.system(tmpl("helpTmpl", { cmds: cmds }));
               }
             } ]
         ]).each(function(idx, cmdInfo) {
           var fn = cmdInfo[4];
-          fn.cmdName = cmdInfo[0].toUpperCase();
           fn.help = {
+            cmdName: cmdInfo[0].toUpperCase(),
             usage: cmdInfo[1],
             quick: cmdInfo[2],
             detailed: cmdInfo[3]
           };
 
-          cmds[fn.cmdName] = fn;
+          cmds[fn.help.cmdName] = fn;
         });
 
         return cmds;
