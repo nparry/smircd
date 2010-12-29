@@ -222,10 +222,16 @@
               if (cmd) {
                 console.log("Showing help for " + cmd);
                 var fn = cmds[cmd.toUpperCase()];
-                publishMsg.system(
-                  "<h2>SmIRCd Client Help: " + fn.cmdName + " command</h2>\n" +
-                  "<p>Usage: /" + fn.cmdName + " " + fn.help.usage + "</p>\n" +
-                  "<p>" + fn.help.detailed + "</p>");
+                if (fn) {
+                  publishMsg.system(
+                    "<h2>SmIRCd Client Help: " + fn.cmdName + " command</h2>\n" +
+                    "<p>Usage: /" + fn.cmdName + " " + fn.help.usage + "</p>\n" +
+                    "<p>" + fn.help.detailed + "</p>");
+                }
+                else {
+                  console.log("Help requested for invalid command " + cmd);
+                  publishMsg.error("Can not show help for invalid command: " + cmd);
+                }
               }
               else {
                 console.log("Showing help");
