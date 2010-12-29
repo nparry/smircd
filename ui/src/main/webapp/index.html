@@ -204,6 +204,10 @@
         return {
           system: function(msg) {
             _publishMsg("system", '<div class="systemMsg">' + msg + '</div>');
+          },
+
+          error: function(msg) {
+            _publishMsg("error", '<p class="error">' + msg + '</p>');
           }
         };
       })();
@@ -257,6 +261,14 @@
               console.log("Processing user command");
               var tokenAndRest = splitToken(input);
               var cmd = tokenAndRest[0].substring(1).toUpperCase();
+              if (userCommands[cmd]) {
+                console.log("Firing " + cmd + " command");
+                userCommands[cmd](tokenAndRest[1])
+              }
+              else {
+                console.log("User entered invalid command: " + cmd);
+                publishMsg.error("Invalid command: " + cmd);
+              }
             }
             else {
               console.log("Processing user message");
@@ -264,6 +276,19 @@
           }
         };
       })();
+
+      $('form').submit(function(evt) {
+        try {
+          $(evt.target).find('input').val(function(idx, currentVal) {
+            userInputProcessor.process(currentVal);
+            return '';
+          });
+        } catch (err) {
+          publishMsg.error("Internal error: " + err);
+        }
+
+        return false;
+      });
 
     </script>
   </body>
