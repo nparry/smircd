@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>SmIRCd Client</title>
+    <link rel="stylesheet" href="http://fonts.googleapis.com/css?family=Ubuntu">
+    <link rel="stylesheet" href="http://fonts.googleapis.com/css?family=Droid+Sans">
+    <link rel="stylesheet" href="http://fonts.googleapis.com/css?family=Droid+Sans+Mono">
+    <link rel="stylesheet" href="http://yui.yahooapis.com/3.2.0/build/cssreset/reset-min.css">
+    <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.4.4/jquery.min.js"></script>
+    <style>
+      body {
+        font-family: 'Droid Sans';
+      }
+
+      body > div {
+        position: fixed;
+        width: 100%;
+        padding: 0 0.25em 0 0.25em;
+        overflow: auto;
+      }
+      
+      body > div:first-child, body > div:last-of-type {
+        height: 2em;
+        line-height: 2em;
+        -webkit-box-shadow: 0 0 16px #333;
+        background: #1C4A72;
+      }
+
+      body > div:first-child { top: 0; }
+      body > div:last-of-type { bottom: 0; }
+
+      h1, h2, h3 {
+        font-family: 'Ubuntu';
+      }
+
+      h1, h1 + h2, h2 + h2 {
+        display: inline;
+        color: white;
+      }
+
+      h2:before {
+        padding: 0 0.25em 0 0.25em;
+        color: #EB8900;
+        content: '>';
+      }
+
+      input {
+        width: 50%;
+        border: 1px solid #353B41;
+        border-radius: 5px;
+        background: #eee;
+      }
+
+      .transcript {
+        top: 2em;
+        bottom: 2em;
+        border-top: 1px solid #353B41;
+        border-bottom: 1px solid #353B41;
+        line-height: 1.25em;
+      }
+
+      .transcript p {
+        margin-bottom: 0.5em;
+      }
+
+      .transcript > h3 {
+        display: inline-block;
+        width: 7em;
+        text-align: right;
+        color: #777;
+      }
+
+      .transcript h3 + p {
+        display: block;
+        padding-left: 7.25em;
+        margin-top: -1.25em;
+      }
+
+      .event, .action, .error {
+        color: #666;
+        font-family: 'Droid Sans Mono';
+      }
+
+      .event:before, .action:before, .error:before {
+        padding-right: 0.25em;
+        content: '***';
+      }
+
+      .action {
+        font-style:italic;
+      }
+
+      .error {
+        color: #A61300;
+      }
+
+      .welcome {
+        background: #ddd;
+        border: 2px solid #ddd;
+        border-radius: 10px;
+        margin: 1em;
+        padding: 0.25em 1em 0.25em 1em;
+      }
+
+      .systemMsg {
+        border-left: 2px solid #1C4A72;
+        background: #eee;
+        padding: 0.25em;
+        margin-bottom: 0.5em;
+      }
+
+      .systemMsg td {
+        padding-right: 1em;
+      }
+
+      .command {
+        color: #666;
+        font-family: 'Droid Sans Mono';
+      }
+
+      .nick {
+        background: #FFBB00;
+        border: 2px solid #FFBB00;
+        border-radius: 5px;
+      }
+
+    </style>
+  </head>
+  <body>
+    <div>
+      <h1>SmIRCd Client</h1>
+      <h2>Connected to server:6667 as nparry</h2>
+      <h2>In channel #foo</h2>
+    </div>
+    <div class="transcript">
+      <div class="welcome">
+        <h2>SmIRCd Client</h2>
+        <p>
+        Welcome to IRC!
+        To get started, type <span class="command">/CONNECT &lt;nickname&gt; [&lt;password&gt;] [@&lt;server&gt;]</span>.
+        Once connected, join a channel with <span class="command">/JOIN &lt;#channelname&gt;</span> or see the available channels with <span class="command">/LIST</span>.
+        You can type <span class="command">/HELP</span> at any time.
+        </p>
+      </div>
+
+      <!--
+      <h3>nparry</h3>
+      <p>hello everyone! how are we going today?  Good I hope.  The idea is that this block should make a nice border with the nice name 'column' which will we be faking</p>
+      
+      <h3>someone</h3>
+      <p>Cool, I hope this actually works!  What happens if we stretch this line so it wraps - will it then do what we want</p>
+
+      <h3>another</h3>
+      <p>A short line!</p>
+
+      <h3>another</h3>
+      <p><span class="nick">nparry:</span> blah blah blah.
+
+      <p class="event">foobar joined channel #foo</p> 
+
+      <h3>someone</h3>
+      <p>Cool, I hope this actually works!  What happens if we stretch this line so it wraps - will it then do what we want</p>
+
+      <p class="event">foobar left channel #foo<p>
+
+      <p class="error">foobar left channel #foo<p>
+
+      <p class="action">someone shrugs</p>
+      -->
+    </div>
+    <div>
+      <form>
+        <input type="text" autofocus placeholder="Enter a command then press enter...">
+      </form>
+    </div>
+    <script>
+      var splitToken = function(s) {
+        if (!s) {
+          return [null, null];
+        }
+
+        s = $.trim(s);
+        var index = s.search(/\s+/);
+        if (s.length == 0) {
+          return [null, null];
+        }
+        else if (index == -1) {
+          return [s, null];
+        }
+        else {
+          return [s.substring(0, index), $.trim(s.substring(index))];
+        }
+      };
+
+      var firstToken = function(s) { return splitToken(s)[0]; }
+
+      var publishMsg = (function() {
+        var _publishMsg = function(msgType, msgText) {
+          // TODO - fire event rather than push stuff into dom
+          $(".transcript").append(msgText).scrollTop($(".transcript").attr("scrollHeight"));
+        };
+
+        return {
+          system: function(msg) {
+            _publishMsg("system", '<div class="systemMsg">' + msg + '</div>');
+          }
+        };
+      })();
+
+      var userCommands = (function() {
+        var cmds = { };
+        $([
+          [ "HELP", "[command]", "Display help",
+            "Display available commands, or the usage of a specific command",
+            function(input) {
+              var cmd = firstToken(input);
+              if (cmd) {
+                console.log("Showing help for " + cmd);
+                var fn = cmds[cmd.toUpperCase()];
+                publishMsg.system(
+                  "<h2>SmIRCd Client Help: " + fn.cmdName + " command</h2>\n" +
+                  "<p>Usage: /" + fn.cmdName + " " + fn.help.usage + "</p>\n" +
+                  "<p>" + fn.help.detailed + "</p>");
+              }
+              else {
+                console.log("Showing help");
+                var msg = "<h2>SmIRCd Client Help</h2>\n" +
+                 "<p>Use /HELP [command] to get more information about a specific command</p>\n<table>\n";
+                $.each(cmds, function(key, value) {
+                  msg += "<tr><td>" + key + "</td><td>" + value.help.quick + "</td></tr>\n";
+                });
+                msg += "</table>";
+                publishMsg.system(msg);
+              }
+            } ]
+        ]).each(function(idx, cmdInfo) {
+          var fn = cmdInfo[4];
+          fn.cmdName = cmdInfo[0].toUpperCase();
+          fn.help = {
+            usage: cmdInfo[1],
+            quick: cmdInfo[2],
+            detailed: cmdInfo[3]
+          };
+
+          cmds[fn.cmdName] = fn;
+        });
+
+        return cmds;
+      })();
+
+      var userInputProcessor = (function() {
+        return {
+          process: function(input) {
+            if (input.length == 0) { return; }
+            if (input[0] == "/") {
+              console.log("Processing user command");
+              var tokenAndRest = splitToken(input);
+              var cmd = tokenAndRest[0].substring(1).toUpperCase();
+            }
+            else {
+              console.log("Processing user message");
+            }
+          }
+        };
+      })();
+
+    </script>
+  </body>
+</html>
+
