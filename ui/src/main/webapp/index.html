@@ -273,6 +273,50 @@
           $(".transcript").append(msg.text).scrollTop($(".transcript").attr("scrollHeight"));
       });
 
+      var ircServer = (function() {
+        var connected = false;
+
+        var getHostPort = function(str) {
+          var parts = str.split(":");
+          switch (parts.length) {
+            case 1: return { host: parts[0], port: 6667 };
+            case 2: return { host: parts[0], port: parseInt(parts[1]) };
+            default: return { host: '', port: NaN };
+          }
+        };
+
+        var public = {
+          disconnect: function() {
+            if (connected) {
+              console.log("Disconnecting from server");
+              connected = false;
+              publish("serverDisconnected");
+            }
+            else {
+              console.log("Skipping disconnect, not connected");
+            }
+          },
+
+          connect: function(server, nickname, password) {
+            public.disconnect();
+
+            server = server || (location.host || 'localhost')
+            console.log("Connecting to " + server + " as " + nickname + " using password " + password);
+
+            var hp = getHostPort(server);
+            if (hp.host.length == 0 || isNaN(hp.port)) {
+              publishMsg.error("Invalid server " + server);
+              return;
+            }
+
+            connected = true;
+            publish("serverConnected", { host: hp.host, port: hp.port, nickname: nickname });
+          }
+        };
+
+        return public;
+      })();
+
       var publishMsg = (function() {
         var _publishMsg = function(msgType, msgText) {
           publish("showMsg", { type: msgType, text: msgText });
@@ -292,7 +336,8 @@
       var userCommands = (function() {
         var cmds = { };
         $([
-          [ "HELP", "[command]", "Display help",
+          [ "HELP", "[command]",
+            "Display help",
             "Display available commands, or the usage of a specific command",
             function(input) {
               var cmd = firstToken(input);
@@ -311,6 +356,41 @@
                 console.log("Showing help");
                 publishMsg.system(tmpl("helpTmpl", { cmds: cmds }));
               }
+            } ],
+          [ "CONNECT", "nickname [password] [@server]",
+            "Connect to the IRC server",
+            "Connect to the given IRC server. Password and server are optional, with a default server used if none is specified.",
+            function(input) {
+              var tokenAndRest = splitToken(input);
+              var nickname = tokenAndRest[0];
+              var server = null, password = null;
+
+              if (!nickname) {
+                console.log("Missing nickname param");
+                publishMsg.error("Nickname is required");
+                return;
+              }
+
+              while (tokenAndRest[1]) {
+                tokenAndRest = splitToken(tokenAndRest[1]);
+                if (tokenAndRest[0][0] == '@') {
+                  server = tokenAndRest[0].substring(1);
+                  if (!server) {
+                    publishMsg.error("Empty server parameter");
+                    return;
+                  }
+                  break;
+                }
+                else if (!password) {
+                  password = tokenAndRest[0];
+                }
+                else {
+                  publishMsg.error("Unexpected parameter " + tokenAndRest[0]);
+                  return;
+                }
+              }
+
+              ircServer.connect(server, nickname, password);
             } ]
         ]).each(function(idx, cmdInfo) {
           var fn = cmdInfo[4];
