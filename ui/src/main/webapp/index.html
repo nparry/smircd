@@ -255,12 +255,27 @@
         }
       };
 
-      var firstToken = function(s) { return splitToken(s)[0]; }
+      var firstToken = function(s) { return splitToken(s)[0]; };
+
+      var subscribe = function(evtName, callback) {
+        $(document).bind(evtName, function(evt, evtData) {
+          callback(evtData);
+        });
+      };
+
+      var publish = function(evtName, evtData) {
+        console.log("Firing " + evtName + " event");
+        $(document).trigger(evtName, evtData);
+      };
+
+      // todo - more robust transcript management
+      subscribe("showMsg", function(msg) {
+          $(".transcript").append(msg.text).scrollTop($(".transcript").attr("scrollHeight"));
+      });
 
       var publishMsg = (function() {
         var _publishMsg = function(msgType, msgText) {
-          // TODO - fire event rather than push stuff into dom
-          $(".transcript").append(msgText).scrollTop($(".transcript").attr("scrollHeight"));
+          publish("showMsg", { type: msgType, text: msgText });
         };
 
         return {
@@ -321,7 +336,7 @@
               var tokenAndRest = splitToken(input);
               var cmd = tokenAndRest[0].substring(1).toUpperCase();
               if (userCommands[cmd]) {
-                console.log("Firing " + cmd + " command");
+                console.log("Invoking " + cmd + " command");
                 userCommands[cmd](tokenAndRest[1])
               }
               else {
