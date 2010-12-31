@@ -35,8 +35,12 @@
       }
 
       h1, h1 + h2, h2 + h2 {
-        display: inline;
+        float: left;
         color: white;
+      }
+
+      h1 + h2, h2 + h2 {
+        display: none;
       }
 
       h2:before {
@@ -130,8 +134,8 @@
   <body>
     <div>
       <h1>SmIRCd Client</h1>
-      <h2>Connected to server:6667 as nparry</h2>
-      <h2>In channel #foo</h2>
+      <h2>Connected to <span class="currentHost">server</span>:<span class="currentPort">port</span> as <span class="currentNickname">nickname</span></h2>
+      <h2>In channel <span class="currentChannel">#channel</span></h2>
     </div>
     <div class="transcript">
       <div class="welcome">
@@ -268,11 +272,6 @@
         $(document).trigger(evtName, evtData);
       };
 
-      // todo - more robust transcript management
-      subscribe("showMsg", function(msg) {
-          $(".transcript").append(msg.text).scrollTop($(".transcript").attr("scrollHeight"));
-      });
-
       var ircServer = (function() {
         var connected = false;
 
@@ -285,20 +284,20 @@
           }
         };
 
-        var public = {
-          disconnect: function() {
-            if (connected) {
-              console.log("Disconnecting from server");
-              connected = false;
-              publish("serverDisconnected");
-            }
-            else {
-              console.log("Skipping disconnect, not connected");
-            }
-          },
+        var disconnect = function() {
+          if (connected) {
+            console.log("Disconnecting from server");
+            connected = false;
+            publish("serverDisconnected");
+          }
+          else {
+            console.log("Skipping disconnect, not connected");
+          }
+        };
 
+        var public = {
           connect: function(server, nickname, password) {
-            public.disconnect();
+            disconnect();
 
             server = server || (location.host || 'localhost')
             console.log("Connecting to " + server + " as " + nickname + " using password " + password);
@@ -443,6 +442,43 @@
 
         return false;
       });
+
+      // todo - more robust transcript management
+      subscribe("showMsg", function(msg) {
+          $(".transcript").append(msg.text).scrollTop($(".transcript").attr("scrollHeight"));
+      });
+
+      (function() {
+        // Trigger animation on connect/disconnect, but since the
+        // animation happens asynch with respect to the events firing,
+        // run everything through a queue to make sure one animation
+        // sequence finishes before the next begins.
+        var theQ = $({});
+        subscribe("serverConnected", function(data) {
+          theQ.queue(function(driveQueue) {
+            $('.currentHost').text(data.host);
+            $('.currentPort').text(data.port);
+            $('.currentNickname').text(data.nickname);
+
+            var stopAt = $('.currentHost').parent().next();
+            $('h1').next('h2').show('fast', function() {
+              if (!$(this).next().not(stopAt).show('fast', arguments.callee).length) {
+                driveQueue();
+              }
+            });
+          });
+        });
+
+        subscribe("serverDisconnected", function() {
+          theQ.queue(function(driveQueue) {
+            $('h1').parent().children('h2').last().hide('fast', function() {
+              if (!$(this).prev('h2').hide('fast', arguments.callee).length) {
+                driveQueue();
+              }
+            });
+          });
+        });
+      })();
 
     </script>
   </body>
