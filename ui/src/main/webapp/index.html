@@ -134,7 +134,7 @@
   <body>
     <div>
       <h1>SmIRCd Client</h1>
-      <h2>Connected to <span class="currentHost">server</span>:<span class="currentPort">port</span> as <span class="currentNickname">nickname</span></h2>
+      <h2 id="connectionInfo"><script type="text/html" id="connectionInfoTmpl">Connected to <%= host %>:<%= port %> as <%= nickname %></script></h2>
       <h2>In channel <span class="currentChannel">#channel</span></h2>
     </div>
     <div class="transcript">
@@ -456,12 +456,8 @@
         var theQ = $({});
         subscribe("serverConnected", function(data) {
           theQ.queue(function(driveQueue) {
-            $('.currentHost').text(data.host);
-            $('.currentPort').text(data.port);
-            $('.currentNickname').text(data.nickname);
-
-            var stopAt = $('.currentHost').parent().next();
-            $('h1').next('h2').show('fast', function() {
+            var stopAt = $('#connectionInfo').text(tmpl('connectionInfoTmpl', data)).next();
+            $('#connectionInfo').show('fast', function() {
               if (!$(this).next().not(stopAt).show('fast', arguments.callee).length) {
                 driveQueue();
               }
@@ -471,8 +467,9 @@
 
         subscribe("serverDisconnected", function() {
           theQ.queue(function(driveQueue) {
-            $('h1').parent().children('h2').last().hide('fast', function() {
-              if (!$(this).prev('h2').hide('fast', arguments.callee).length) {
+            var stopAt = $('#connectionInfo').prev();
+            $('#connectionInfo').siblings().last().hide('fast', function() {
+              if (!$(this).prev().not(stopAt).hide('fast', arguments.callee).length) {
                 driveQueue();
               }
             });
