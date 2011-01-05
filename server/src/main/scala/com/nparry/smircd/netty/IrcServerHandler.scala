@@ -12,7 +12,7 @@ import com.nparry.smircd.protocol.Command._
 
 import grizzled.slf4j.Logger
 
-class IrcServerHandler(ircServer: Daemon, channels: ChannelGroup) extends SimpleChannelUpstreamHandler {
+class IrcServerHandler(ircServer: Daemon) extends SimpleChannelUpstreamHandler {
   val logger = Logger(this.getClass())
   
   var actor: Option[Actor] = None
@@ -21,14 +21,19 @@ class IrcServerHandler(ircServer: Daemon, channels: ChannelGroup) extends Simple
     actor.map(fn)
   }
 
-  override def channelOpen(ctx: ChannelHandlerContext, e: ChannelStateEvent) = {
-    logger.debug("Channel open for " + e.getChannel)
-    channels.add(e.getChannel)
-    actor = Some(new ConnectionActor(e.getChannel(), ircServer))
+  def open(channel: Channel): IrcServerHandler = {
+    actor = Some(new ConnectionActor(channel, ircServer))
     for (a <- actor) {
       a.start()
       a ! true
     }
+
+    this
+  }
+
+  override def channelOpen(ctx: ChannelHandlerContext, e: ChannelStateEvent) = {
+    logger.debug("Channel open for " + e.getChannel)
+    open(e.getChannel)
   }
   
   override def channelClosed(ctx: ChannelHandlerContext, e: ChannelStateEvent) = {
