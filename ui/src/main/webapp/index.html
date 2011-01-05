@@ -273,6 +273,8 @@
       };
 
       var ircServer = (function() {
+        var currentNickname = null;
+        var ircSocket = null;
         var connected = false;
 
         var getHostPort = function(str) {
@@ -284,7 +286,36 @@
           }
         };
 
+        var toIrcCommandString = function(args) {
+          if (args.length > 1) {
+            var lastArg = args[args.length - 1];
+            if (lastArg == "") {
+              args[args.length - 1] = ":";
+            }
+            else if (lastArg.indexOf(" ") >= 0) {
+              args[args.length - 1] = ":" + lastArg;
+            }
+          }
+
+          if (currentNickname) {
+            args.shift(":" + currentNickname);
+          }
+
+          return args.join(" ");
+        };
+
         var disconnect = function() {
+          currentNickname = null;
+
+          if (ircSocket) {
+            console.log("Closing websocket");
+            ircSocket.close();
+            ircSocket = null;
+          }
+          else {
+            console.log("Skipping websocket close");
+          }
+
           if (connected) {
             console.log("Disconnecting from server");
             connected = false;
@@ -308,8 +339,45 @@
               return;
             }
 
-            connected = true;
-            publish("serverConnected", { host: hp.host, port: hp.port, nickname: nickname });
+            ircSocket = new WebSocket("ws://" + hp.host + ":" + hp.port + "/ircWebSocket");
+
+            var connectTimeout = window.setTimeout(function() {
+              console.log("Connect timeout fired");
+              publishMsg.error("Timeout connecting to " + server);
+              disconnect();
+            }, 5000);
+
+            ircSocket.onopen = function() {
+              console.log("Connection open");
+              window.clearTimeout(connectTimeout);
+              connected = true;
+              public.send("NICK", nickname);
+              public.send("USER", nickname, server, "smircd", nickname);
+              currentNickname = nickname;
+              publish("serverConnected", { host: hp.host, port: hp.port, nickname: nickname });
+            };
+            ircSocket.onclose = function() {
+              console.log("Connection closed");
+              ircSocket = null;
+              disconnect();
+            };
+            ircSocket.onmessage = function(msg) {
+              console.log("IRC server returned " + msg.data);
+            };
+            ircSocket.onerror = function(err) {
+              console.log(err);
+            };
+          },
+
+          send: function() {
+            var cmd = toIrcCommandString(Array.prototype.slice.apply(arguments));
+            console.log("Sending [" + cmd + "] to server");
+            if (ircSocket) {
+              ircSocket.send(cmd);
+            }
+            else {
+              publishMsg.error("Not connected, cannot send " + cmd);
+            }
           }
         };
 
