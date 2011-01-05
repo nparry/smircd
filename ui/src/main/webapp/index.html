@@ -298,10 +298,49 @@
           }
 
           if (currentNickname) {
-            args.shift(":" + currentNickname);
+            args.unshift(":" + currentNickname);
           }
 
           return args.join(" ");
+        };
+
+        var parseIrcCommandString = function(str, result) {
+          result = result || {
+            cmd: null,
+            args: []
+          };
+
+          if (!str) {
+            return result;
+          }
+          else if (!result.cmd) {
+            var tokenAndRest = splitToken(str);
+            if (!tokenAndRest[0]) {
+              return result;
+            }
+            else if (tokenAndRest[0][0] == ":") {
+              result.prefix = tokenAndRest[0].substring(1);
+              return parseIrcCommandString(tokenAndRest[1], result);
+            }
+            else {
+              result.cmd = tokenAndRest[0];
+              return parseIrcCommandString(tokenAndRest[1], result);
+            }
+          }
+          else if (str[0] == ":") {
+            result.args.push(str.substring(1));
+            return result;
+          }
+          else {
+            var tokenAndRest = splitToken(str);
+            if (!tokenAndRest[0]) {
+              return result;
+            }
+            else {
+              result.args.push(tokenAndRest[0]);
+              return parseIrcCommandString(tokenAndRest[1], result);
+            }
+          }
         };
 
         var disconnect = function() {
@@ -362,7 +401,14 @@
               disconnect();
             };
             ircSocket.onmessage = function(msg) {
-              console.log("IRC server returned " + msg.data);
+              console.log("Received [" + msg.data + "] from server");
+              var parsed = parseIrcCommandString(msg.data);
+              if (!parsed.cmd) {
+                publishMsg.error("Internal error: Unable to parse " + msg.data);
+              }
+              else {
+                publish("receivedIrcMsg", parsed);
+              }
             };
             ircSocket.onerror = function(err) {
               console.log(err);
@@ -378,8 +424,20 @@
             else {
               publishMsg.error("Not connected, cannot send " + cmd);
             }
+          },
+
+          subscribeToMsg: function(cmdName, callback) {
+            subscribe("receivedIrcMsg", function(parsed) {
+              if (parsed.cmd == cmdName) {
+                callback(parsed);
+              }
+            });
           }
         };
+
+        public.subscribeToMsg("PING", function() {
+          public.send("PONG");
+        });
 
         return public;
       })();
