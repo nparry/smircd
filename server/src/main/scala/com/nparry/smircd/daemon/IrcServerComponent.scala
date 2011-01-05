@@ -155,7 +155,7 @@ trait IrcServerComponent {
               ignore
           })
 
-          grouped.get(dropThreshold).foreach(_.keySet.foreach { getUser(_) { user =>
+          grouped.get(dropThreshold).foreach(_.keySet.foreach { getUser(_, false) { user =>
             // TODO: Duplicate code in the disconnect case below
             logger.debug("Dropping connection to " + user)
             if (user.isRegistered) {
@@ -168,7 +168,7 @@ trait IrcServerComponent {
             deleteUser(user)
           }})
 
-          grouped.get(pingThreshold).foreach(_.keySet.foreach { getUser(_) { user =>
+          grouped.get(pingThreshold).foreach(_.keySet.foreach { getUser(_, false) { user =>
             if (user.isRegistered) {
               logger.debug("Pinging " + user)
               user.send(SupportedCommand(serverId, "PING", List()))
