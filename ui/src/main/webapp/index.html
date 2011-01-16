@@ -383,7 +383,7 @@
         };
 
         var public = {
-          responseCode: {
+          RC: {
             RPL_TRACELINK: "200",
             RPL_TRACECONNECTING: "201",
             RPL_TRACEHANDSHAKE: "202",
@@ -588,7 +588,11 @@
 
             subscribe("receivedIrcMsg", function(parsed) {
               if (targetMsgs[parsed.cmd]) {
-                callback(parsed);
+                try {
+                  callback(parsed);
+                } catch (err) {
+                  console.error("Error in callback for " + parsed.cmd + ": " + err);
+                }
               }
             });
           }
@@ -774,8 +778,12 @@
         });
       })();
 
+      ircServer.subscribeToMsg(ircServer.RC.ERR_NICKNAMEINUSE, function() {
+        publishMsg.error("Nickname already in use");
+      });
+
       var subscribeAndBuffer = function(startCode, dataCode, endCode, tmplName, dataFn) {
-        var buffer = null, rc = ircServer.responseCode;
+        var buffer = null, rc = ircServer.RC;
         ircServer.subscribeToMsg([rc[startCode], rc[dataCode], rc[endCode]], function(msg) {
           if (msg.cmd == rc[startCode]) {
             console.log("Buffering for " + tmplName);
