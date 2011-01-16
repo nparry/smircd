@@ -114,7 +114,7 @@
         margin-bottom: 0.5em;
       }
 
-      .systemMsg td {
+      .systemMsg td, th {
         padding-right: 1em;
       }
 
@@ -174,9 +174,19 @@
 
       <script type="text/html" id="motdTmpl">
         <h2>Message of the Day</h2>
-        <% $.each(motd, function(idx, msg) { %>
+        <% $.each(buffer, function(idx, msg) { %>
           <p><%= msg %></p>
         <% }); %>
+      </script>
+
+      <script type="text/html" id="listTmpl">
+        <h2>Channel list</h2>
+        <table>
+          <tr><th>Channel</th><th>Count</th><th>Topic</th></tr>
+          <% $.each(buffer, function(idx, chan) { %>
+            <tr><td><%= chan.name %></td><td><%= chan.count %></td><td><%= chan.topic %></td></tr>
+          <% }); %>
+        </table>
       </script>
 
       <!--
@@ -665,6 +675,18 @@
               }
 
               ircServer.connect(server, nickname, password);
+            } ],
+          [ "LIST", "[channel]",
+            "List channel information",
+            "List information about the specified channel, or all channels if none is specified",
+            function(input) {
+              var targetChannel = firstToken(input);
+              if (targetChannel) {
+                ircServer.send("LIST", targetChannel);
+              }
+              else {
+                ircServer.send("LIST");
+              }
             } ]
         ]).each(function(idx, cmdInfo) {
           var fn = cmdInfo[4];
@@ -752,26 +774,42 @@
         });
       })();
 
-      (function() {
-        var motd = null, rc = ircServer.responseCode;
-        ircServer.subscribeToMsg([rc.RPL_MOTDSTART, rc.RPL_MOTD, rc.RPL_ENDOFMOTD], function(msg) {
-          if (msg.cmd == rc.RPL_MOTDSTART) {
-            console.log("Buffering MOTD");
-            motd = [];
+      var subscribeAndBuffer = function(startCode, dataCode, endCode, tmplName, dataFn) {
+        var buffer = null, rc = ircServer.responseCode;
+        ircServer.subscribeToMsg([rc[startCode], rc[dataCode], rc[endCode]], function(msg) {
+          if (msg.cmd == rc[startCode]) {
+            console.log("Buffering for " + tmplName);
+            buffer = [];
           }
-          else if (msg.cmd == rc.RPL_MOTD && msg.args.length > 1) {
-            motd.push($(document.createTextNode(msg.args[1])).text());
+          else if (msg.cmd == rc[dataCode]) {
+            var data = dataFn(msg);
+            if (data) {
+              buffer.push(data);
+            }
           }
           else {
-            console.log("MOTD complete");
-            if (motd.length > 0) {
-              publishMsg.system(tmpl("motdTmpl", { motd: motd }));
+            console.log("Buffering complete for " + tmplName);
+            if (buffer.length > 0) {
+              publishMsg.system(tmpl(tmplName, { buffer: buffer }));
             }
 
-            motd = null;
+            buffer = null;
           }
         });
-      })();
+      };
+
+      subscribeAndBuffer("RPL_MOTDSTART", "RPL_MOTD", "RPL_ENDOFMOTD", "motdTmpl", function(msg) {
+        return (msg.args.length == 0)? null :
+          $(document.createTextNode(msg.args[1])).text();
+      });
+
+      subscribeAndBuffer("RPL_LISTSTART", "RPL_LIST", "RPL_LISTEND", "listTmpl", function(msg) {
+        return (msg.args.length < 4)? null : {
+          name: msg.args[1],
+          count: msg.args[2],
+          topic: msg.args[3]
+        };
+      });
 
     </script>
   </body>
