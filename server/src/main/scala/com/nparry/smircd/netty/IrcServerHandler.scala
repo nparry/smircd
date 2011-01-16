@@ -61,12 +61,14 @@ class IrcServerHandler(ircServer: Daemon) extends SimpleChannelUpstreamHandler {
 
   class ConnectionActor(channel: Channel, ircServer: Daemon) extends Actor {
 
+    var currentFuture: Option[ChannelFuture] = None
+
     def toServer(a: Any) = {
       ircServer ! (this, a)
     }
 
     def sendOutbound(c: SupportedCommand) = {
-      channel.write(c)
+      currentFuture = Some(channel.write(c))
     }
 
     def act() {
@@ -74,7 +76,9 @@ class IrcServerHandler(ircServer: Daemon) extends SimpleChannelUpstreamHandler {
         react {
           case IrcServer.OutboundMessage(m) => sendOutbound(m)
           case IrcServer.Shutdown() => {
-            channel.close
+            currentFuture
+              .map(_.addListener(ChannelFutureListener.CLOSE))
+              .getOrElse(channel.close)
             exit() 
           }
           case b: Boolean => toServer(b)
