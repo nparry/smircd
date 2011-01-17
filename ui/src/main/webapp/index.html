@@ -152,6 +152,10 @@
         <div class="systemMsg"><%= msg %></div>
       </script>
 
+      <script type="text/html" id="eventMsgTmpl">
+        <div class="event"><%= msg %></div>
+      </script>
+
       <script type="text/html" id="errorMsgTmpl">
         <p class="error"><%= msg %></p>
       </script>
@@ -202,14 +206,8 @@
       <h3>another</h3>
       <p><span class="nick">nparry:</span> blah blah blah.
 
-      <p class="event">foobar joined channel #foo</p> 
-
       <h3>someone</h3>
       <p>Cool, I hope this actually works!  What happens if we stretch this line so it wraps - will it then do what we want</p>
-
-      <p class="event">foobar left channel #foo<p>
-
-      <p class="error">foobar left channel #foo<p>
 
       <p class="action">someone shrugs</p>
       -->
@@ -291,6 +289,7 @@
 
       var ircServer = (function() {
         var currentNickname = null;
+        var currentChannel = null;
         var ircSocket = null;
         var connected = false;
 
@@ -602,6 +601,16 @@
           public.send("PONG");
         });
 
+        public.subscribeToMsg("JOIN", function(parsed) {
+          if (parsed.prefix && parsed.prefix == currentNickname) {
+            currentChannel = parsed.args[0];
+            publishMsg.event("Joined channel " + currentChannel);
+          }
+          else {
+            publishMsg.event(parsed.prefix + " joined channel " + parsed.args[0]);
+          }
+        });
+
         return public;
       })();
 
@@ -610,14 +619,16 @@
           publish("showMsg", { type: msgType, text: msgText });
         };
 
-        return {
-          system: function(msg) {
-            _publishMsg("system", tmpl("systemMsgTmpl", { msg: msg }));
-          },
+        var _makePublisher = function(msgType) {
+          return function(msg) {
+            _publishMsg(msgType, tmpl(msgType + "MsgTmpl", { msg: msg }));
+          };
+        };
 
-          error: function(msg) {
-            _publishMsg("error", tmpl("errorMsgTmpl", { msg: msg }));
-          }
+        return {
+          system: _makePublisher("system"),
+          event: _makePublisher("event"),
+          error: _makePublisher("error")
         };
       })();
 
@@ -679,6 +690,18 @@
               }
 
               ircServer.connect(server, nickname, password);
+            } ],
+          [ "JOIN", "channel",
+            "Join a channel",
+            "Join the specified channel",
+            function(input) {
+              var targetChannel = firstToken(input);
+              if (targetChannel) {
+                ircServer.send("JOIN", targetChannel);
+              }
+              else {
+                publishMsg.error("Channel name is required");
+              }
             } ],
           [ "LIST", "[channel]",
             "List channel information",
