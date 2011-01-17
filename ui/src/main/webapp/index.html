@@ -276,6 +276,23 @@
 
       var firstToken = function(s) { return splitToken(s)[0]; };
 
+      var makeSafe = function(unsafe) {
+        switch ($.type(unsafe)) {
+          case 'array':
+            return $.map(unsafe, function(el) { return makeSafe(el); });
+          case 'object':
+            var safe = {};
+            $.each(unsafe, function(name, val) {
+              safe[makeSafe(name)] = makeSafe(val);
+            });
+            return safe;
+          case 'string':
+            return $(document.createElement('div')).text(unsafe).html();
+          default:
+            throw $.type(unsafe) + " value " + unsafe + " can not be made safe";
+        }
+      };
+
       var subscribe = function(evtName, callback) {
         $(document).bind(evtName, function(evt, evtData) {
           callback(evtData);
@@ -619,14 +636,16 @@
           publish("showMsg", { type: msgType, text: msgText });
         };
 
-        var _makePublisher = function(msgType) {
+        var _makePublisher = function(msgType, allowUnsafe) {
           return function(msg) {
-            _publishMsg(msgType, tmpl(msgType + "MsgTmpl", { msg: msg }));
+            allowUnsafe = allowUnsafe || false;
+            var msgTxt = allowUnsafe? msg : makeSafe(msg);
+            _publishMsg(msgType, tmpl(msgType + "MsgTmpl", { msg: msgTxt }));
           };
         };
 
         return {
-          system: _makePublisher("system"),
+          system: _makePublisher("system", true),
           event: _makePublisher("event"),
           error: _makePublisher("error")
         };
@@ -821,7 +840,8 @@
           else {
             console.log("Buffering complete for " + tmplName);
             if (buffer.length > 0) {
-              publishMsg.system(tmpl(tmplName, { buffer: buffer }));
+              var safeBuffer = makeSafe(buffer);
+              publishMsg.system(tmpl(tmplName, { buffer: safeBuffer }));
             }
 
             buffer = null;
@@ -830,8 +850,7 @@
       };
 
       subscribeAndBuffer("RPL_MOTDSTART", "RPL_MOTD", "RPL_ENDOFMOTD", "motdTmpl", function(msg) {
-        return (msg.args.length == 0)? null :
-          $(document.createTextNode(msg.args[1])).text();
+        return (msg.args.length < 2)? null : msg.args[1];
       });
 
       subscribeAndBuffer("RPL_LISTSTART", "RPL_LIST", "RPL_LISTEND", "listTmpl", function(msg) {
