@@ -304,9 +304,54 @@
         $(document).trigger(evtName, evtData);
       };
 
+      var channelManager = (function() {
+        var activeChannels = [];
+
+        var _modifyChannels = function(toRemove, toAdd) {
+          var oldCurrent = public.currentChannel();
+
+          var idx = activeChannels.indexOf(toRemove);
+          if (idx != -1) {
+            var removed = activeChannels.splice(idx, 1);
+            console.log("Removed " + removed + " from active channel list");
+          }
+
+          if (toAdd) {
+            activeChannels.unshift(toAdd);
+            console.log("Updated active channel list is " + activeChannels);
+          }
+
+          var newCurrent = public.currentChannel();
+          if (newCurrent != oldCurrent) {
+            console.log("Active channel has changed from " + oldCurrent + " to " + newCurrent);
+            publish("currentChannelChanged", {
+              oldChannel:  oldCurrent,
+              newChannel: newCurrent
+            });
+          }
+        };
+
+        subscribe("joinedChannel", function(chan) {
+          console.log("Joined channel " + chan);
+          _modifyChannels(chan, chan);
+        });
+
+        subscribe("leftChannel", function(chan) {
+          console.log("Left channel " + chan);
+          _modifyChannels(chan);
+        });
+
+        var public = {
+          currentChannel: function() {
+            return (activeChannels.length > 0)? activeChannels[0] : null;
+          }
+        };
+
+        return public;
+      })();
+
       var ircServer = (function() {
         var currentNickname = null;
-        var currentChannel = null;
         var ircSocket = null;
         var connected = false;
 
@@ -618,14 +663,16 @@
           public.send("PONG");
         });
 
-        public.subscribeToMsg("JOIN", function(parsed) {
-          if (parsed.prefix && parsed.prefix == currentNickname) {
-            currentChannel = parsed.args[0];
-            publishMsg.event("Joined channel " + currentChannel);
+        public.subscribeToMsg(["JOIN", "PART"], function(parsed) {
+          var action = (parsed.cmd == "JOIN")? "joined" : "left";
+          var actor = (parsed.prefix == currentNickname)? "You" : parsed.prefix;
+          var channel = parsed.args[0];
+
+          if (parsed.prefix == currentNickname) {
+            publish((parsed.cmd == "JOIN")? "joinedChannel" : "leftChannel", channel);
           }
-          else {
-            publishMsg.event(parsed.prefix + " joined channel " + parsed.args[0]);
-          }
+
+          publishMsg.event([actor, action, "channel", channel].join(" "));
         });
 
         return public;
@@ -720,6 +767,18 @@
               }
               else {
                 publishMsg.error("Channel name is required");
+              }
+            } ],
+          [ "PART", "[channel]",
+            "Leave a channel",
+            "Leave the specified channel, or the current channel if none is specified",
+            function(input) {
+              var targetChannel = firstToken(input) || channelManager.currentChannel();
+              if (targetChannel) {
+                ircServer.send("PART", targetChannel);
+              }
+              else {
+                publishMsg.error("Not a memeber of any channel");
               }
             } ],
           [ "LIST", "[channel]",
