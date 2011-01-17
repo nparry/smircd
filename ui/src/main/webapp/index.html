@@ -135,7 +135,7 @@
     <div>
       <h1>SmIRCd Client</h1>
       <h2 id="connectionInfo"><script type="text/html" id="connectionInfoTmpl">Connected to <%= host %>:<%= port %> as <%= nickname %></script></h2>
-      <h2>In channel <span class="currentChannel">#channel</span></h2>
+      <h2 id="channelInfo"><script type="text/html" id="channelInfoTmpl">In channel <%= channel %></script></h2>
     </div>
     <div class="transcript">
       <div class="welcome">
@@ -308,7 +308,7 @@
         var activeChannels = [];
 
         var _modifyChannels = function(toRemove, toAdd) {
-          var oldCurrent = public.currentChannel();
+          var previousChannel = public.currentChannel();
 
           var idx = activeChannels.indexOf(toRemove);
           if (idx != -1) {
@@ -321,12 +321,12 @@
             console.log("Updated active channel list is " + activeChannels);
           }
 
-          var newCurrent = public.currentChannel();
-          if (newCurrent != oldCurrent) {
-            console.log("Active channel has changed from " + oldCurrent + " to " + newCurrent);
+          var newChannel = public.currentChannel();
+          if (newChannel != previousChannel) {
+            console.log("Active channel has changed from " + previousChannel + " to " + newChannel);
             publish("currentChannelChanged", {
-              oldChannel:  oldCurrent,
-              newChannel: newCurrent
+              previousChannel:  previousChannel,
+              channel: newChannel
             });
           }
         };
@@ -851,31 +851,51 @@
       });
 
       (function() {
-        // Trigger animation on connect/disconnect, but since the
+        // Trigger animation on connect/disconnect/etc, but since the
         // animation happens asynch with respect to the events firing,
         // run everything through a queue to make sure one animation
         // sequence finishes before the next begins.
         var theQ = $({});
-        subscribe("serverConnected", function(data) {
+        var driveReveal = function(id, data) {
+          var target = '#' + id;
           theQ.queue(function(driveQueue) {
-            var stopAt = $('#connectionInfo').text(tmpl('connectionInfoTmpl', data)).next();
-            $('#connectionInfo').show('fast', function() {
+            var stopAt = $(target).text(tmpl(id + 'Tmpl', data)).next();
+            $(target).show('fast', function() {
               if (!$(this).next().not(stopAt).show('fast', arguments.callee).length) {
                 driveQueue();
               }
             });
           });
-        });
+        };
 
-        subscribe("serverDisconnected", function() {
+        var driveConceal = function(id) {
+          var target = '#' + id;
           theQ.queue(function(driveQueue) {
-            var stopAt = $('#connectionInfo').prev();
-            $('#connectionInfo').siblings().last().hide('fast', function() {
+            var stopAt = $(target).prev();
+            $(target).parent().children().last().hide('fast', function() {
               if (!$(this).prev().not(stopAt).hide('fast', arguments.callee).length) {
                 driveQueue();
               }
             });
           });
+        };
+
+        subscribe("serverConnected", function(data) {
+          driveReveal('connectionInfo', data);
+        });
+
+        subscribe("serverDisconnected", function() {
+          driveConceal('connectionInfo');
+        });
+
+        subscribe("currentChannelChanged", function(data) {
+          if (data.previousChannel) {
+            driveConceal('channelInfo');
+          }
+
+          if (data.channel) {
+            driveReveal('channelInfo', data);
+          }
         });
       })();
 
