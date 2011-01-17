@@ -293,7 +293,7 @@
         var ircSocket = null;
         var connected = false;
 
-        var getHostPort = function(str) {
+        var _getHostPort = function(str) {
           var parts = str.split(":");
           switch (parts.length) {
             case 1: return { host: parts[0], port: 6667 };
@@ -302,7 +302,7 @@
           }
         };
 
-        var toIrcCommandString = function(args) {
+        var _toIrcCommandString = function(args) {
           if (args.length > 1) {
             var lastArg = args[args.length - 1];
             if (lastArg == "") {
@@ -320,7 +320,7 @@
           return args.join(" ");
         };
 
-        var parseIrcCommandString = function(str, result) {
+        var _parseIrcCommandString = function(str, result) {
           result = result || {
             cmd: null,
             args: []
@@ -336,11 +336,11 @@
             }
             else if (tokenAndRest[0][0] == ":") {
               result.prefix = tokenAndRest[0].substring(1);
-              return parseIrcCommandString(tokenAndRest[1], result);
+              return _parseIrcCommandString(tokenAndRest[1], result);
             }
             else {
               result.cmd = tokenAndRest[0];
-              return parseIrcCommandString(tokenAndRest[1], result);
+              return _parseIrcCommandString(tokenAndRest[1], result);
             }
           }
           else if (str[0] == ":") {
@@ -354,12 +354,12 @@
             }
             else {
               result.args.push(tokenAndRest[0]);
-              return parseIrcCommandString(tokenAndRest[1], result);
+              return _parseIrcCommandString(tokenAndRest[1], result);
             }
           }
         };
 
-        var disconnect = function() {
+        var _disconnect = function() {
           currentNickname = null;
 
           if (ircSocket) {
@@ -520,12 +520,12 @@
           },
 
           connect: function(server, nickname, password) {
-            disconnect();
+            _disconnect();
 
             server = server || (location.host || 'localhost')
             console.log("Connecting to " + server + " as " + nickname + " using password " + password);
 
-            var hp = getHostPort(server);
+            var hp = _getHostPort(server);
             if (hp.host.length == 0 || isNaN(hp.port)) {
               publishMsg.error("Invalid server " + server);
               return;
@@ -536,7 +536,7 @@
             var connectTimeout = window.setTimeout(function() {
               console.log("Connect timeout fired");
               publishMsg.error("Timeout connecting to " + server);
-              disconnect();
+              _disconnect();
             }, 5000);
 
             ircSocket.onopen = function() {
@@ -551,11 +551,11 @@
             ircSocket.onclose = function() {
               console.log("Connection closed");
               ircSocket = null;
-              disconnect();
+              _disconnect();
             };
             ircSocket.onmessage = function(msg) {
               console.log("Received [" + msg.data + "] from server");
-              var parsed = parseIrcCommandString(msg.data);
+              var parsed = _parseIrcCommandString(msg.data);
               if (!parsed.cmd) {
                 publishMsg.error("Internal error: Unable to parse " + msg.data);
               }
@@ -569,7 +569,7 @@
           },
 
           send: function() {
-            var cmd = toIrcCommandString(Array.prototype.slice.apply(arguments));
+            var cmd = _toIrcCommandString(Array.prototype.slice.apply(arguments));
             console.log("Sending [" + cmd + "] to server");
             if (ircSocket) {
               ircSocket.send(cmd);
