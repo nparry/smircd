@@ -208,9 +208,14 @@
       <script type="text/html" id="listTmpl">
         <h2>Channel list</h2>
         <table>
-          <tr><th>Channel</th><th>Count</th><th>Topic</th></tr>
+          <tr><th>Channel</th><th>Count</th><th>Is Member?</th><th>Topic</th></tr>
           <% $.each(buffer, function(idx, chan) { %>
-            <tr><td><%= chan.name %></td><td><%= chan.count %></td><td><%= chan.topic %></td></tr>
+            <tr>
+              <td><%= chan.name %></td>
+              <td><%= chan.count %></td>
+              <td><%= chan.isMember %></td>
+              <td><%= chan.topic %></td>
+            </tr>
           <% }); %>
         </table>
       </script>
@@ -351,6 +356,10 @@
         var public = {
           currentChannel: function() {
             return (activeChannels.length > 0)? activeChannels[0] : null;
+          },
+
+          isMember: function(channelName) {
+            return $.inArray(channelName, activeChannels) != -1;
           }
         };
 
@@ -949,6 +958,7 @@
         return (msg.args.length < 4)? null : {
           name: msg.args[1],
           count: msg.args[2],
+          isMember: channelManager.isMember(msg.args[1])? '*' : ' ',
           topic: msg.args[3]
         };
       });
