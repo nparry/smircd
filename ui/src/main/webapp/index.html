@@ -50,7 +50,7 @@
       }
 
       input {
-        width: 50%;
+        width: 100%;
         border: 1px solid #353B41;
         border-radius: 5px;
         background: #eee;
@@ -68,17 +68,32 @@
         margin-bottom: 0.5em;
       }
 
-      .transcript > h3 {
-        display: inline-block;
-        width: 7em;
-        text-align: right;
+      .chatMsg {
+        margin-left: 9em;
+      }
+
+      .chatMsg.backgroundChannel {
+        opacity: 0.5;
+      }
+
+      .chatMsg h3 {
+        display: inline;
+        margin-right: 1em;
+        margin-left: -9em;
         color: #777;
       }
 
-      .transcript h3 + p {
-        display: block;
-        padding-left: 7.25em;
-        margin-top: -1.25em;
+      .chatMsg.private h3 {
+        color: #EB8900;
+      }
+
+      .chatMsg h3:before {
+        margin-right: 1em;
+        content: attr(date);
+      }
+
+      .chatMsg h3 + p {
+        display: inline;
       }
 
       .event, .action, .error {
@@ -156,6 +171,13 @@
         <div class="event"><%= msg %></div>
       </script>
 
+      <script type="text/html" id="chatMsgTmpl">
+        <div class="chatMsg <%= msgType %>">
+          <h3 date="<%= msgDate %>"><%= msgSender %></h3>
+          <p><%= message %></p>
+        </div>
+      </script>
+
       <script type="text/html" id="errorMsgTmpl">
         <p class="error"><%= msg %></p>
       </script>
@@ -194,21 +216,6 @@
       </script>
 
       <!--
-      <h3>nparry</h3>
-      <p>hello everyone! how are we going today?  Good I hope.  The idea is that this block should make a nice border with the nice name 'column' which will we be faking</p>
-
-      <h3>someone</h3>
-      <p>Cool, I hope this actually works!  What happens if we stretch this line so it wraps - will it then do what we want</p>
-
-      <h3>another</h3>
-      <p>A short line!</p>
-
-      <h3>another</h3>
-      <p><span class="nick">nparry:</span> blah blah blah.
-
-      <h3>someone</h3>
-      <p>Cool, I hope this actually works!  What happens if we stretch this line so it wraps - will it then do what we want</p>
-
       <p class="action">someone shrugs</p>
       -->
     </div>
@@ -630,6 +637,10 @@
             };
           },
 
+          currentNickname: function() {
+            return currentNickname;
+          },
+
           send: function() {
             var cmd = _toIrcCommandString(Array.prototype.slice.apply(arguments));
             console.log("Sending [" + cmd + "] to server");
@@ -684,16 +695,18 @@
         };
 
         var _makePublisher = function(msgType, allowUnsafe) {
+          allowUnsafe = allowUnsafe || false;
           return function(msg) {
-            allowUnsafe = allowUnsafe || false;
-            var msgTxt = allowUnsafe? msg : makeSafe(msg);
-            _publishMsg(msgType, tmpl(msgType + "MsgTmpl", { msg: msgTxt }));
+            msg = allowUnsafe? msg : makeSafe(msg);
+            var tmplArg = ($.type(msg) == 'string')?  { msg: msg } : msg;
+            _publishMsg(msgType, tmpl(msgType + "MsgTmpl", tmplArg));
           };
         };
 
         return {
           system: _makePublisher("system", true),
           event: _makePublisher("event"),
+          chat: _makePublisher("chat"),
           error: _makePublisher("error")
         };
       })();
@@ -938,6 +951,47 @@
           count: msg.args[2],
           topic: msg.args[3]
         };
+      });
+
+      ircServer.subscribeToMsg("PRIVMSG", function(msg) {
+        var t  = msg.args[0];
+        publish(t == ircServer.currentNickname()? "privateMessage" : "channelMessage", {
+          msgSender: msg.prefix,
+          msgTarget: t,
+          message: msg.args[1]
+        });
+      });
+
+      var getDate = function() {
+        var pad = function(num) {
+          return (num < 10)? "0" + num : num;
+        };
+
+        var d = new Date();
+        return [d.getFullYear(), pad(d.getMonth() + 1), pad(d.getDate())].join('-') +
+          ' ' +
+          [pad(d.getHours()), pad(d.getMinutes())].join(':');
+      };
+
+      subscribe("privateMessage", function(evt) {
+        console.log("Received private message");
+        publishMsg.chat($.extend({}, evt, {
+          msgDate: getDate(),
+          msgType: 'private',
+          msgSender: '*' + evt.msgSender + '*'
+        }));
+      });
+
+      subscribe("channelMessage", function(evt) {
+        console.log("Received message for channel " + evt.msgTarget);
+        var forActiveChannel = (evt.msgTarget == channelManager.currentChannel());
+        publishMsg.chat($.extend({}, evt, {
+          msgDate: getDate(),
+          msgType: forActiveChannel? 'activeChannel' : 'backgroundChannel',
+          msgSender: forActiveChannel?
+            evt.msgSender :
+            evt.msgSender + "(" + evt.msgTarget + ")"
+        }));
       });
 
     </script>
