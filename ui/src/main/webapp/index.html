@@ -459,6 +459,23 @@
           }
         };
 
+        var _subscribeToCommandsForEvent = function(evt, cmdNames, callback) {
+          var targetMsgs = { };
+          $.each($.makeArray(cmdNames), function(idx, el) {
+            targetMsgs[el] = true }
+          );
+
+          subscribe(evt, function(msg) {
+            if (targetMsgs[msg.cmd]) {
+              try {
+                callback(msg);
+              } catch (err) {
+                console.error("Error in callback for " + msg.cmd + ": " + err);
+              }
+            }
+          });
+        }
+
         var public = {
           RC: {
             RPL_TRACELINK: "200",
@@ -651,10 +668,14 @@
           },
 
           send: function() {
-            var cmd = _toIrcCommandString(Array.prototype.slice.apply(arguments));
-            console.log("Sending [" + cmd + "] to server");
+            var rawArgs = Array.prototype.slice.apply(arguments);
+            var cmd = rawArgs[0];
+            var cmdArgs = rawArgs.slice(1)
+            var cmdString = _toIrcCommandString(rawArgs);
             if (ircSocket) {
-              ircSocket.send(cmd);
+              console.log("Sending [" + cmdString + "] to server");
+              publish("sendingIrcMsg", { cmd: cmd, args: cmdArgs });
+              ircSocket.send(cmdString);
             }
             else {
               publishMsg.error("Not connected, cannot send " + cmd);
@@ -662,37 +683,16 @@
           },
 
           subscribeToMsg: function(cmdNames, callback) {
-            var targetMsgs = { };
-            $.each($.makeArray(cmdNames), function(idx, el) {
-              targetMsgs[el] = true }
-            );
+            _subscribeToCommandsForEvent("receivedIrcMsg", cmdNames, callback);
+          },
 
-            subscribe("receivedIrcMsg", function(parsed) {
-              if (targetMsgs[parsed.cmd]) {
-                try {
-                  callback(parsed);
-                } catch (err) {
-                  console.error("Error in callback for " + parsed.cmd + ": " + err);
-                }
-              }
-            });
+          subscribeToTransmission: function(cmdNames, callback) {
+            _subscribeToCommandsForEvent("sendingIrcMsg", cmdNames, callback);
           }
         };
 
         public.subscribeToMsg("PING", function() {
           public.send("PONG");
-        });
-
-        public.subscribeToMsg(["JOIN", "PART"], function(parsed) {
-          var action = (parsed.cmd == "JOIN")? "joined" : "left";
-          var actor = (parsed.prefix == currentNickname)? "You" : parsed.prefix;
-          var channel = parsed.args[0];
-
-          if (parsed.prefix == currentNickname) {
-            publish((parsed.cmd == "JOIN")? "joinedChannel" : "leftChannel", channel);
-          }
-
-          publishMsg.event([actor, action, "channel", channel].join(" "));
         });
 
         return public;
@@ -813,6 +813,21 @@
               }
               else {
                 ircServer.send("LIST");
+              }
+            } ],
+          [ "MSG", "<user|channel> <message>",
+            "Send a message",
+            "Send a message to the given user or channel",
+            function(input) {
+              var tokenAndRest = splitToken(input);
+              if (!tokenAndRest[0]) {
+                publishMsg.error("Message recipient is required");
+              }
+              else if (!tokenAndRest[1]) {
+                publishMsg.error("Message is required");
+              }
+              else {
+                ircServer.send("PRIVMSG", tokenAndRest[0], tokenAndRest[1]);
               }
             } ]
         ]).each(function(idx, cmdInfo) {
@@ -963,11 +978,29 @@
         };
       });
 
+      ircServer.subscribeToMsg(["JOIN", "PART"], function(msg) {
+        var action = (msg.cmd == "JOIN")? "joined" : "left";
+        var actor = (msg.prefix == ircServer.currentNickname())? "You" : msg.prefix;
+        var channel = msg.args[0];
+
+        if (msg.prefix == ircServer.currentNickname()) {
+          publish((msg.cmd == "JOIN")? "joinedChannel" : "leftChannel", channel);
+        }
+
+        publishMsg.event([actor, action, "channel", channel].join(" "));
+      });
+
       ircServer.subscribeToMsg("PRIVMSG", function(msg) {
-        var t  = msg.args[0];
-        publish(t == ircServer.currentNickname()? "privateMessage" : "channelMessage", {
+        publish("incomingChatMessage", {
           msgSender: msg.prefix,
-          msgTarget: t,
+          msgTarget: msg.args[0],
+          message: msg.args[1]
+        });
+      });
+
+      ircServer.subscribeToTransmission("PRIVMSG", function(msg) {
+        publish("outgoingChatMessage", {
+          msgTarget: msg.args[0],
           message: msg.args[1]
         });
       });
@@ -983,24 +1016,27 @@
           [pad(d.getHours()), pad(d.getMinutes())].join(':');
       };
 
-      subscribe("privateMessage", function(evt) {
-        console.log("Received private message");
+      subscribe("incomingChatMessage", function(evt) {
+        console.log("Received chat message for " + evt.msgTarget);
+        var privateMsg  = (evt.msgTarget == ircServer.currentNickname());
+        var forActiveChannel = (evt.msgTarget == channelManager.currentChannel());
+
         publishMsg.chat($.extend({}, evt, {
           msgDate: getDate(),
-          msgType: 'private',
-          msgSender: '*' + evt.msgSender + '*'
+          msgType: privateMsg? 'private' :
+            forActiveChannel? 'activeChannel' : 'backgroundChannel',
+          msgSender: privateMsg? '*' + evt.msgSender + '*' :
+            forActiveChannel? evt.msgSender : evt.msgSender + "(" + evt.msgTarget + ")"
         }));
       });
 
-      subscribe("channelMessage", function(evt) {
-        console.log("Received message for channel " + evt.msgTarget);
+      subscribe("outgoingChatMessage", function(evt) {
+        console.log("Sending chat message to " + evt.msgTarget);
         var forActiveChannel = (evt.msgTarget == channelManager.currentChannel());
         publishMsg.chat($.extend({}, evt, {
           msgDate: getDate(),
-          msgType: forActiveChannel? 'activeChannel' : 'backgroundChannel',
-          msgSender: forActiveChannel?
-            evt.msgSender :
-            evt.msgSender + "(" + evt.msgTarget + ")"
+          msgType: 'outbound',
+          msgSender: forActiveChannel? '>' :  '> (' + evt.msgTarget + ')'
         }));
       });
 
