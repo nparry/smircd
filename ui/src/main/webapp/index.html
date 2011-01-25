@@ -864,6 +864,12 @@
             }
             else {
               console.log("Processing user message");
+              if (channelManager.currentChannel()) {
+                ircServer.send("PRIVMSG", channelManager.currentChannel(), input);
+              }
+              else {
+                publishMsg.error("Can not send message - not in any channel");
+              }
             }
           }
         };
