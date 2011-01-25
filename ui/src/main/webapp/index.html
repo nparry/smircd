@@ -942,8 +942,17 @@
         });
       })();
 
-      ircServer.subscribeToMsg(ircServer.RC.ERR_NICKNAMEINUSE, function() {
-        publishMsg.error("Nickname already in use");
+      $.each([
+        [ "ERR_NICKNAMEINUSE", "Nickname already in use" ],
+        [ "ERR_NOSUCHNICK", "No such nickname" ],
+        [ "ERR_NOSUCHCHANNEL", "No such channel" ],
+        [ "ERR_NOTONCHANNEL", "Not on channel" ]
+      ], function(idx, entry) {
+        var errorCode = ircServer.RC[entry[0]];
+        var cannedMsg = entry[1];
+        ircServer.subscribeToMsg(errorCode, function(msg) {
+          publishMsg.error(cannedMsg? cannedMsg : msg.args[0]);
+        });
       });
 
       var subscribeAndBuffer = function(startCode, dataCode, endCode, tmplName, dataFn) {
