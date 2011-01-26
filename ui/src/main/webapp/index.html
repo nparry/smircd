@@ -803,6 +803,21 @@
                 publishMsg.error("Not a memeber of any channel");
               }
             } ],
+          [ "TOPIC", "<channel> [message]",
+            "Set or query the topic for a channel",
+            "Set the topic for the specified channel if a topic is provided, or query for the current topic",
+            function(input) {
+              var tokenAndRest = splitToken(input);
+              if (!tokenAndRest[0]) {
+                publishMsg.error("Channel is required");
+              }
+              else if (!tokenAndRest[1]) {
+                ircServer.send("TOPIC", tokenAndRest[0]);
+              }
+              else {
+                ircServer.send("TOPIC", tokenAndRest[0], tokenAndRest[1]);
+              }
+            } ],
           [ "LIST", "[channel]",
             "List channel information",
             "List information about the specified channel, or all channels if none is specified",
@@ -1003,6 +1018,24 @@
         }
 
         publishMsg.event([actor, action, "channel", channel].join(" "));
+      });
+
+      ircServer.subscribeToMsg("TOPIC", function(msg) {
+        var actor = (msg.prefix == ircServer.currentNickname())? "You" : msg.prefix;
+        publishMsg.event([
+          actor,
+          "changed the topic of channel",
+          msg.args[0],
+          "to",
+          msg.args[1]].join(" "));
+      });
+
+      ircServer.subscribeToMsg(ircServer.RC.RPL_TOPIC, function(msg) {
+        publishMsg.event(["The topic for channel", msg.args[1], "is", msg.args[2]].join(" "));
+      });
+
+      ircServer.subscribeToMsg(ircServer.RC.RPL_NOTOPIC, function(msg) {
+        publishMsg.event(["No topic is set for channel", msg.args[1]].join(" "));
       });
 
       ircServer.subscribeToMsg("PRIVMSG", function(msg) {
