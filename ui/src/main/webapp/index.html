@@ -844,6 +844,17 @@
               else {
                 ircServer.send("PRIVMSG", tokenAndRest[0], tokenAndRest[1]);
               }
+            } ],
+          [ "AWAY", "[message]",
+            "Mark yourself as away",
+            "Mark yourself as away with the given message, or un-away if no message is given",
+            function(input) {
+              if (input) {
+                ircServer.send("AWAY", input);
+              }
+              else {
+                ircServer.send("AWAY");
+              }
             } ]
         ]).each(function(idx, cmdInfo) {
           var fn = cmdInfo[4];
@@ -1036,6 +1047,18 @@
 
       ircServer.subscribeToMsg(ircServer.RC.RPL_NOTOPIC, function(msg) {
         publishMsg.event(["No topic is set for channel", msg.args[1]].join(" "));
+      });
+
+      ircServer.subscribeToMsg(ircServer.RC.RPL_NOWAWAY, function(msg) {
+        publishMsg.event("You are now away");
+      });
+
+      ircServer.subscribeToMsg(ircServer.RC.RPL_UNAWAY, function(msg) {
+        publishMsg.event("You are no longer away");
+      });
+
+      ircServer.subscribeToMsg(ircServer.RC.RPL_AWAY, function(msg) {
+        publishMsg.event(msg.args[1] + " is away (" + msg.args[2] + ")");
       });
 
       ircServer.subscribeToMsg("PRIVMSG", function(msg) {
