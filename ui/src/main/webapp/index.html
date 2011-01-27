@@ -92,6 +92,15 @@
         content: attr(date);
       }
 
+      .chatMsg.private h3 span:before, .chatMsg.private h3 span:after {
+        content: "*";
+      }
+
+      .chatMsg.backgroundChannel h3:after, .action.backgroundChannel span:after {
+        margin-left: 0.25em;
+        content: "(" attr(msgtarget) ")";
+      }
+
       .chatMsg h3 + p {
         display: inline;
       }
@@ -172,12 +181,14 @@
       </script>
 
       <script type="text/html" id="actionMsgTmpl">
-        <p class="action <%= msgType %>"><%= message %></p>
+        <p class="action <%= msgType %>">
+          <span msgtarget="<%= msgTarget %>"><%= msgSender %></span> <%= message %>
+        </p>
       </script>
 
       <script type="text/html" id="chatMsgTmpl">
         <div class="chatMsg <%= msgType %>">
-          <h3 date="<%= msgDate %>"><%= msgSender %></h3>
+          <h3 date="<%= msgDate %>" msgtarget="<%= msgTarget %>"><span><%= msgSender %></span></h3>
           <p><%= message %></p>
         </div>
       </script>
@@ -1113,16 +1124,14 @@
         if (isAction) {
           publishMsg.action($.extend({}, evt, {
             msgType: forActiveChannel? 'activeChannel' : 'backgroundChannel',
-            message: evt.msgSender + " " + tokenAndRest[1]
+            message: tokenAndRest[1]
           }));
         }
         else {
           publishMsg.chat($.extend({}, evt, {
             msgDate: getDate(),
             msgType: privateMsg? 'private' :
-              forActiveChannel? 'activeChannel' : 'backgroundChannel',
-            msgSender: privateMsg? '*' + evt.msgSender + '*' :
-              forActiveChannel? evt.msgSender : evt.msgSender + "(" + evt.msgTarget + ")"
+              forActiveChannel? 'activeChannel' : 'backgroundChannel'
           }));
         }
       });
@@ -1137,7 +1146,7 @@
         if (isAction) {
           publishMsg.action($.extend({}, evt, {
             msgType: 'outbound',
-            message: ircServer.currentNickname() + " " + tokenAndRest[1],
+            message: tokenAndRest[1],
             msgSender: ircServer.currentNickname()
           }));
         }
