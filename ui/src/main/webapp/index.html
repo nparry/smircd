@@ -68,12 +68,12 @@
         margin-bottom: 0.5em;
       }
 
-      .chatMsg {
-        margin-left: 9em;
+      .backgroundChannel {
+        opacity: 0.5;
       }
 
-      .chatMsg.backgroundChannel {
-        opacity: 0.5;
+      .chatMsg {
+        margin-left: 9em;
       }
 
       .chatMsg h3 {
@@ -171,6 +171,10 @@
         <div class="event"><%= msg %></div>
       </script>
 
+      <script type="text/html" id="actionMsgTmpl">
+        <p class="action <%= msgType %>"><%= message %></p>
+      </script>
+
       <script type="text/html" id="chatMsgTmpl">
         <div class="chatMsg <%= msgType %>">
           <h3 date="<%= msgDate %>"><%= msgSender %></h3>
@@ -219,10 +223,6 @@
           <% }); %>
         </table>
       </script>
-
-      <!--
-      <p class="action">someone shrugs</p>
-      -->
     </div>
     <div>
       <form>
@@ -715,6 +715,7 @@
         return {
           system: _makePublisher("system", true),
           event: _makePublisher("event"),
+          action: _makePublisher("action"),
           chat: _makePublisher("chat"),
           error: _makePublisher("error")
         };
@@ -854,6 +855,20 @@
               }
               else {
                 ircServer.send("AWAY");
+              }
+            } ],
+          [ "ME", "<action>",
+            "Describe what you are doing",
+            "Describe what you are doing the current channel",
+            function(input) {
+              if (!input) {
+                publishMsg.error("Action is required");
+              }
+              else if (channelManager.currentChannel()) {
+                ircServer.send("PRIVMSG", channelManager.currentChannel(), "ACTION " + input);
+              }
+              else {
+                publishMsg.error("Can not send message - not in any channel");
               }
             } ]
         ]).each(function(idx, cmdInfo) {
@@ -1092,23 +1107,47 @@
         var privateMsg  = (evt.msgTarget == ircServer.currentNickname());
         var forActiveChannel = (evt.msgTarget == channelManager.currentChannel());
 
-        publishMsg.chat($.extend({}, evt, {
-          msgDate: getDate(),
-          msgType: privateMsg? 'private' :
-            forActiveChannel? 'activeChannel' : 'backgroundChannel',
-          msgSender: privateMsg? '*' + evt.msgSender + '*' :
-            forActiveChannel? evt.msgSender : evt.msgSender + "(" + evt.msgTarget + ")"
-        }));
+        var tokenAndRest = splitToken(evt.message);
+        var isAction = !privateMsg && tokenAndRest[0] == "ACTION";
+
+        if (isAction) {
+          publishMsg.action($.extend({}, evt, {
+            msgType: forActiveChannel? 'activeChannel' : 'backgroundChannel',
+            message: evt.msgSender + " " + tokenAndRest[1]
+          }));
+        }
+        else {
+          publishMsg.chat($.extend({}, evt, {
+            msgDate: getDate(),
+            msgType: privateMsg? 'private' :
+              forActiveChannel? 'activeChannel' : 'backgroundChannel',
+            msgSender: privateMsg? '*' + evt.msgSender + '*' :
+              forActiveChannel? evt.msgSender : evt.msgSender + "(" + evt.msgTarget + ")"
+          }));
+        }
       });
 
       subscribe("outgoingChatMessage", function(evt) {
         console.log("Sending chat message to " + evt.msgTarget);
         var forActiveChannel = (evt.msgTarget == channelManager.currentChannel());
-        publishMsg.chat($.extend({}, evt, {
-          msgDate: getDate(),
-          msgType: 'outbound',
-          msgSender: forActiveChannel? '>' :  '> (' + evt.msgTarget + ')'
-        }));
+
+        var tokenAndRest = splitToken(evt.message);
+        var isAction = forActiveChannel && tokenAndRest[0] == "ACTION";
+
+        if (isAction) {
+          publishMsg.action($.extend({}, evt, {
+            msgType: 'outbound',
+            message: ircServer.currentNickname() + " " + tokenAndRest[1],
+            msgSender: ircServer.currentNickname()
+          }));
+        }
+        else {
+          publishMsg.chat($.extend({}, evt, {
+            msgDate: getDate(),
+            msgType: 'outbound',
+            msgSender: forActiveChannel? '>' :  '> (' + evt.msgTarget + ')'
+          }));
+        }
       });
 
     </script>
