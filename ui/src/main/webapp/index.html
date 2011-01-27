@@ -876,7 +876,9 @@
                 publishMsg.error("Action is required");
               }
               else if (channelManager.currentChannel()) {
-                ircServer.send("PRIVMSG", channelManager.currentChannel(), "ACTION " + input);
+                ircServer.send("PRIVMSG",
+                  channelManager.currentChannel(),
+                  "\x01ACTION " + input + "\x01");
               }
               else {
                 publishMsg.error("Can not send message - not in any channel");
@@ -1119,12 +1121,12 @@
         var forActiveChannel = (evt.msgTarget == channelManager.currentChannel());
 
         var tokenAndRest = splitToken(evt.message);
-        var isAction = !privateMsg && tokenAndRest[0] == "ACTION";
+        var isAction = !privateMsg && tokenAndRest[0] == "\x01ACTION";
 
         if (isAction) {
           publishMsg.action($.extend({}, evt, {
             msgType: forActiveChannel? 'activeChannel' : 'backgroundChannel',
-            message: tokenAndRest[1]
+            message: tokenAndRest[1].replace("\x01", "")
           }));
         }
         else {
@@ -1141,12 +1143,12 @@
         var forActiveChannel = (evt.msgTarget == channelManager.currentChannel());
 
         var tokenAndRest = splitToken(evt.message);
-        var isAction = forActiveChannel && tokenAndRest[0] == "ACTION";
+        var isAction = forActiveChannel && tokenAndRest[0] == "\x01ACTION";
 
         if (isAction) {
           publishMsg.action($.extend({}, evt, {
             msgType: 'outbound',
-            message: tokenAndRest[1],
+            message: tokenAndRest[1].replace("\x01", ""),
             msgSender: ircServer.currentNickname()
           }));
         }
