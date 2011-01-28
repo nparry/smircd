@@ -836,7 +836,11 @@
             "Join the specified channel",
             function(input) {
               var targetChannel = firstToken(input);
-              if (targetChannel) {
+              if (targetChannel && channelManager.isMember(targetChannel)) {
+                // Just update the internal state of the active channel
+                publish("joinedChannel", targetChannel);
+              }
+              else if (targetChannel) {
                 ircServer.send("JOIN", targetChannel);
               }
               else {
