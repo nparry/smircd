@@ -378,7 +378,7 @@
       })();
 
       var ircServer = (function() {
-        var currentNickname = null;
+        var nicknameStack = [];
         var ircSocket = null;
         var connected = false;
 
@@ -402,8 +402,8 @@
             }
           }
 
-          if (currentNickname) {
-            args.unshift(":" + currentNickname);
+          if (public.currentNickname()) {
+            args.unshift(":" + public.currentNickname());
           }
 
           return args.join(" ");
@@ -449,7 +449,7 @@
         };
 
         var _disconnect = function() {
-          currentNickname = null;
+          nicknameStack = [];
 
           if (ircSocket) {
             console.log("Closing websocket");
@@ -651,7 +651,7 @@
               connected = true;
               public.send("NICK", nickname);
               public.send("USER", nickname, server, "smircd", nickname);
-              currentNickname = nickname;
+              nicknameStack.unshift(nickname);
               publish("serverConnected", { host: hp.host, port: hp.port, nickname: nickname });
             };
             ircSocket.onclose = function() {
@@ -675,7 +675,26 @@
           },
 
           currentNickname: function() {
-            return currentNickname;
+            return nicknameStack[0];
+          },
+
+          changeNickname: function(newNickname) {
+            var oldNickname = public.currentNickname()
+            if (newNickname == oldNickname) {
+              console.log("Ignoring nickname change");
+              return;
+            }
+
+            if (nicknameStack.length > 10) {
+              nicknameStack = nicknameStack.slice(0, 10);
+            }
+
+            public.send("NICK", newNickname);
+            nicknameStack.unshift(newNickname);
+            publish("nicknameChanged", {
+              oldNickname: oldNickname,
+              newNickname: newNickname
+            });
           },
 
           send: function() {
@@ -704,6 +723,16 @@
 
         public.subscribeToMsg("PING", function() {
           public.send("PONG");
+        });
+
+        public.subscribeToMsg([public.RC.ERR_ERRONEUSNICKNAME, public.RC.ERR_NICKCOLLISION], function() {
+          var oldNickname = nicknameStack.shift();
+          var newNickname = public.currentNickname();
+          console.log("Nickname rolled back from " + oldNickname + " to " + newNickname);
+          publish("nicknameChanged", {
+            oldNickname: oldNickname,
+            newNickname: newNickname
+          });
         });
 
         return public;
@@ -791,6 +820,17 @@
 
               ircServer.connect(server, nickname, password);
             } ],
+          [ "NICK", "nickname",
+            "Change your nickname",
+            "Change your nickname",
+            function(input) {
+              if (!input) {
+                publishMsg.error("Nickname is required");
+              }
+              else {
+                ircServer.changeNickname(input);
+              }
+            } ],
           [ "JOIN", "channel",
             "Join a channel",
             "Join the specified channel",
@@ -815,7 +855,7 @@
                 publishMsg.error("Not a memeber of any channel");
               }
             } ],
-          [ "TOPIC", "<channel> [message]",
+          [ "TOPIC", "channel [message]",
             "Set or query the topic for a channel",
             "Set the topic for the specified channel if a topic is provided, or query for the current topic",
             function(input) {
@@ -842,7 +882,7 @@
                 ircServer.send("LIST");
               }
             } ],
-          [ "MSG", "<user|channel> <message>",
+          [ "MSG", "user|channel message",
             "Send a message",
             "Send a message to the given user or channel",
             function(input) {
@@ -868,7 +908,7 @@
                 ircServer.send("AWAY");
               }
             } ],
-          [ "ME", "<action>",
+          [ "ME", "action",
             "Describe what you are doing",
             "Describe what you are doing the current channel",
             function(input) {
@@ -954,10 +994,13 @@
         // sequence finishes before the next begins.
         var theQ = $({});
         var driveReveal = function(id, data) {
-          var target = '#' + id;
+          var target = '#' + (($.type(id) == 'string')? id : id.attr('id'));
           theQ.queue(function(driveQueue) {
-            var stopAt = $(target).text(tmpl(id + 'Tmpl', data)).next();
-            $(target).show('fast', function() {
+            var stopAt = $(target).next();
+            if (data) {
+              $(target).text(tmpl(id + 'Tmpl', data));
+            }
+            $(target).parent().children().first().show('fast', function() {
               if (!$(this).next().not(stopAt).show('fast', arguments.callee).length) {
                 driveQueue();
               }
@@ -977,12 +1020,24 @@
           });
         };
 
+        var connectData = null;
         subscribe("serverConnected", function(data) {
+          connectionData = data;
           driveReveal('connectionInfo', data);
         });
 
         subscribe("serverDisconnected", function() {
+          connectionData = null;
           driveConceal('connectionInfo');
+        });
+
+        subscribe("nicknameChanged", function(data) {
+          var currentlyVisible = $('#connectionInfo').parent().children(':visible').last();
+          connectionData.nickname = data.newNickname;
+
+          driveConceal('connectionInfo');
+          driveReveal('connectionInfo', connectionData);
+          driveReveal(currentlyVisible, null);
         });
 
         subscribe("currentChannelChanged", function(data) {
@@ -1000,7 +1055,9 @@
         [ "ERR_NICKNAMEINUSE", "Nickname already in use" ],
         [ "ERR_NOSUCHNICK", "No such nickname" ],
         [ "ERR_NOSUCHCHANNEL", "No such channel" ],
-        [ "ERR_NOTONCHANNEL", "Not on channel" ]
+        [ "ERR_NOTONCHANNEL", "Not on channel" ],
+        [ "ERR_ERRONEUSNICKNAME", "Bad nickname" ],
+        [ "ERR_NICKCOLLISION", "Nickname already in use" ]
       ], function(idx, entry) {
         var errorCode = ircServer.RC[entry[0]];
         var cannedMsg = entry[1];
@@ -1045,6 +1102,14 @@
           isMember: channelManager.isMember(msg.args[1])? '*' : ' ',
           topic: msg.args[3]
         };
+      });
+
+      ircServer.subscribeToMsg("NICK", function(msg) {
+        var newNickname = msg.args[0];
+        var oldNickname = msg.prefix;
+        if (newNickname != ircServer.currentNickname()) {
+          publishMsg.event(oldNickname + " is now known as " + newNickname);
+        }
       });
 
       ircServer.subscribeToMsg(["JOIN", "PART"], function(msg) {
