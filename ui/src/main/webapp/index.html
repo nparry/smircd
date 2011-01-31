@@ -364,6 +364,11 @@
           _modifyChannels(chan);
         });
 
+        subscribe("kickedFromChannel", function(chan) {
+          console.log("Kicked from channel " + chan);
+          _modifyChannels(chan);
+        });
+
         subscribe("serverDisconnected", function() {
           activeChannels = [];
         });
@@ -874,6 +879,30 @@
                 publishMsg.error("Not a memeber of any channel");
               }
             } ],
+          [ "KICK", "channel nickname [reason]",
+            "Kick the given user out of the specified channel",
+            "Kick the given user out of the specified channel, optionally including a reason why",
+            function(input) {
+              var tokenAndRest = splitToken(input);
+              var channel = tokenAndRest[0];
+
+              tokenAndRest = splitToken(tokenAndRest[1]);
+              var nickname = tokenAndRest[0];
+              var reason = tokenAndRest[1];
+
+              if (!channel) {
+                publishMsg.error("Channel is required");
+              }
+              else if (!nickname) {
+                publishMsg.error("Nickname is required");
+              }
+              else if (!reason) {
+                ircServer.send("KICK", channel, nickname);
+              }
+              else {
+                ircServer.send("KICK", channel, nickname, reason);
+              }
+            } ],
           [ "TOPIC", "channel [message]",
             "Set or query the topic for a channel",
             "Set the topic for the specified channel if a topic is provided, or query for the current topic",
@@ -1077,7 +1106,8 @@
         [ "ERR_NOSUCHCHANNEL", "No such channel" ],
         [ "ERR_NOTONCHANNEL", "Not on channel" ],
         [ "ERR_ERRONEUSNICKNAME", "Bad nickname" ],
-        [ "ERR_NICKCOLLISION", "Nickname already in use" ]
+        [ "ERR_NICKCOLLISION", "Nickname already in use" ],
+        [ "ERR_USERNOTINCHANNEL", "User not in channel" ]
       ], function(idx, entry) {
         var errorCode = ircServer.RC[entry[0]];
         var cannedMsg = entry[1];
@@ -1134,14 +1164,45 @@
 
       ircServer.subscribeToMsg(["JOIN", "PART"], function(msg) {
         var action = (msg.cmd == "JOIN")? "joined" : "left";
-        var actor = (msg.prefix == ircServer.currentNickname())? "You" : msg.prefix;
+        var actor = msg.prefix;
         var channel = msg.args[0];
 
-        if (msg.prefix == ircServer.currentNickname()) {
+        var eventMessage = [];
+
+        if (actor == ircServer.currentNickname()) {
           publish((msg.cmd == "JOIN")? "joinedChannel" : "leftChannel", channel);
+          eventMessage.push("You");
+        }
+        else {
+          eventMessage.push(actor);
         }
 
-        publishMsg.event([actor, action, "channel", channel].join(" "));
+        eventMessage.push(action, "channel", channel);
+        publishMsg.event(eventMessage.join(" "));
+      });
+
+      ircServer.subscribeToMsg("KICK", function(msg) {
+        var kicker = msg.prefix;
+        var channel = msg.args[0];
+        var victim = msg.args[1];
+        var reason = msg.args[2];
+
+        var eventMessage = [];
+
+        if (victim == ircServer.currentNickname()) {
+          publish("kickedFromChannel", channel);
+          eventMessage.push("You were kicked");
+        }
+        else {
+          eventMessage.push(victim, "was kicked");
+        }
+
+        eventMessage.push("from channel", channel, "by", kicker);
+        if (reason) {
+          eventMessage.push("(" + reason + ")");
+        }
+
+        publishMsg.event(eventMessage.join(" "));
       });
 
       ircServer.subscribeToMsg("TOPIC", function(msg) {
