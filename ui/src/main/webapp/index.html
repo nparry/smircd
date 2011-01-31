@@ -364,6 +364,10 @@
           _modifyChannels(chan);
         });
 
+        subscribe("serverDisconnected", function() {
+          activeChannels = [];
+        });
+
         var public = {
           currentChannel: function() {
             return (activeChannels.length > 0)? activeChannels[0] : null;
@@ -820,6 +824,17 @@
 
               ircServer.connect(server, nickname, password);
             } ],
+          [ "QUIT", "[message]",
+            "Disconnect from the server",
+            "Disconnect from the server, optionally sending a disconnect message",
+            function(input) {
+              if (input) {
+                ircServer.send("QUIT", input);
+              }
+              else {
+                ircServer.send("QUIT");
+              }
+            } ],
           [ "NICK", "nickname",
             "Change your nickname",
             "Change your nickname",
@@ -1033,6 +1048,7 @@
         subscribe("serverDisconnected", function() {
           connectionData = null;
           driveConceal('connectionInfo');
+          publishMsg.event("Disconnected from server");
         });
 
         subscribe("nicknameChanged", function(data) {
