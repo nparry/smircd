@@ -1,8 +1,9 @@
 package com.nparry.smircd.netty
 
 import java.nio.charset.Charset
-
 import java.security.MessageDigest
+
+import scala.io.Source
 
 import org.jboss.netty.buffer._
 import org.jboss.netty.channel._
@@ -175,6 +176,8 @@ class SmircdHttpHandler(ircServer: Daemon) extends SimpleChannelUpstreamHandler 
   def handleHttpRequest(ctx: ChannelHandlerContext, req: HttpRequest) = {
     if (Values.UPGRADE.equalsIgnoreCase(req.getHeader(Names.CONNECTION)) &&
       Values.WEBSOCKET.equalsIgnoreCase(req.getHeader(Names.UPGRADE))) {
+      logger.debug("Upgrading connection to websocket")
+
       // Create the WebSocket handshake response.
       val rsp = new DefaultHttpResponse(HttpVersion.HTTP_1_1,
         new HttpResponseStatus(101, "Web Socket Protocol Handshake"))
@@ -228,12 +231,24 @@ class SmircdHttpHandler(ircServer: Daemon) extends SimpleChannelUpstreamHandler 
       p.addLast("commandEncoder", new CommandEncoder(true))
       p.addLast("ircHandler", new IrcServerHandler(ircServer).open(ctx.getChannel))
     }
-    else {
+    else if (req.getUri().equals("/")) {
+      logger.debug("Returning index page")
       val rsp = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK)
 
       rsp.setHeader(Names.CONTENT_TYPE, "text/html; charset=UTF-8")
+      rsp.setContent(ChannelBuffers.copiedBuffer(
+        Source.fromInputStream(getClass().getResourceAsStream("/index.html")).mkString,
+        CharsetUtil.UTF_8))
 
-      rsp.setContent(ChannelBuffers.copiedBuffer("Todo", CharsetUtil.UTF_8))
+      sendHttpResponse(ctx, req, rsp)
+    }
+    else {
+      logger.debug("Returning 404")
+      val rsp = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.NOT_FOUND)
+
+      rsp.setHeader(Names.CONTENT_TYPE, "text/html; charset=UTF-8")
+      rsp.setContent(ChannelBuffers.copiedBuffer("Nothing here", CharsetUtil.UTF_8))
+
       sendHttpResponse(ctx, req, rsp)
     }
   }
