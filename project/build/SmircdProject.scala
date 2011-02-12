@@ -12,6 +12,29 @@ class SmircdProject(info: ProjectInfo) extends DefaultProject(info) with Proguar
 
   val specs = "org.scala-tools.testing" % "specs_2.8.0" % "1.6.5" % "test"
 
+  override def managedStyle = ManagedStyle.Maven
+  private lazy val repoInfo =
+    if (version.toString.endsWith("-SNAPSHOT"))
+      ( "nparry snapshots" -> "/home/nparry/repository.nparry.com/snapshots" )
+    else
+      ( "nparry releases" -> "/home/nparry/repository.nparry.com/releases" )
+
+  lazy val publishTo = Resolver.ssh(
+    repoInfo._1,
+    "repository.nparry.com",
+    repoInfo._2) as(
+    System.getProperty("user.name"),
+    (Path.userHome / ".ssh" / "id_rsa").asFile)
+
+  override def pomExtra =
+    <licenses>
+      <license>
+        <name>Apache License, Version 2.0</name>
+        <url>http://www.apache.org/licenses/LICENSE-2.0.txt</url>
+        <distribution>repo</distribution>
+      </license>
+    </licenses>
+
   override val mainClass = Some("com.nparry.smircd.Mainline")
 
   // Until https://github.com/nuttycom/sbt-proguard-plugin/pull/2 is fixed
