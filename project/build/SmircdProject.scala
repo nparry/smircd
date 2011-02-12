@@ -26,6 +26,18 @@ class SmircdProject(info: ProjectInfo) extends DefaultProject(info) with Proguar
     System.getProperty("user.name"),
     (Path.userHome / ".ssh" / "id_rsa").asFile)
 
+  override def packageDocsJar = defaultJarPath("-javadoc.jar")
+  override def packageSrcJar = defaultJarPath("-sources.jar")
+
+  val sourceArtifact = Artifact.sources(artifactID)
+  val docsArtifact = Artifact.javadoc(artifactID)
+  val proguardArtifact = Artifact(artifactID, "min")
+
+  override def packageToPublishActions = super.packageToPublishActions ++ Seq(
+    proguard,
+    packageDocs,
+    packageSrc)
+
   override def pomExtra =
     <licenses>
       <license>
@@ -42,6 +54,7 @@ class SmircdProject(info: ProjectInfo) extends DefaultProject(info) with Proguar
   def macJdkClassesPath = Path.fromFile(macJdkBase) / "Classes"/ "classes.jar"
   override def proguardLibraryJars = super.proguardLibraryJars +++ (macJdkClassesPath :PathFinder)
 
+  override def minJarName = artifactBaseName + "-min.jar"
   override def proguardInJars = super.proguardInJars +++ scalaLibraryPath
   override def proguardOptions = List(
     proguardKeepMain("com.nparry.smircd.Mainline"),
