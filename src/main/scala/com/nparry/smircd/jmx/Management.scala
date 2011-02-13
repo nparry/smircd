@@ -3,6 +3,7 @@ package com.nparry.smircd.jmx
 import javax.management._
 
 import com.nparry.smircd.daemon._
+import com.nparry.smircd.protocol._
 
 import grizzled.slf4j.Logger
 
@@ -12,34 +13,65 @@ trait IrcServerMXBean {
   def getPendingConnectionCount(): Int
 }
 
-trait Management extends IrcServerComponent {
+trait IrcChannelMXBean {
+  def getMemberCount(): Int
+  def getTopic(): String
+}
 
-  this: ConnectionComponent with UserComponent with ChannelComponent =>
+trait Management extends IrcServerComponent with ChannelComponent {
+
+  this: ConnectionComponent with UserComponent =>
 
   val logger = Logger(this.getClass())
   val ircServerPort: Int;
 
   def mbeanServer = java.lang.management.ManagementFactory.getPlatformMBeanServer()
-  def jmxName(serverId: String) = new ObjectName("com.nparry.smircd.server:name=" + serverId)
-  def wrapWithUnregistration(f: () => Unit, name: ObjectName) = { () =>
+  def jmxName(s: String) = new ObjectName("com.nparry.smircd." + s)
+
+  def wrapWithUnregistration[T](f: Function0[T], name: ObjectName): Function0[T] = { () =>
     logger.info("Unregistering mbean " + name)
     mbeanServer.unregisterMBean(name)
     f()
   }
 
-  override def makeServer(serverId: String, quit: () => Unit) = {
-    val name = jmxName(serverId)
-    val server = super.makeServer(serverId, wrapWithUnregistration(quit, name))
+  // Ack! Need to figure out how to wrap an arbitrary function :-(
+  def wrapWithUnregistration[A, B](f: Function[A, B], name: ObjectName): Function[A, B] = { (a: A) =>
+    logger.info("Unregistering mbean " + name)
+    mbeanServer.unregisterMBean(name)
+    f(a)
+  }
 
-    logger.info("Registering mbean for " + serverId)
+  override def makeServer(serverId: String, quit: () => Unit) = {
+    val mbeanName = jmxName("server:name=" + serverId)
+    val server = super.makeServer(serverId, wrapWithUnregistration(quit, mbeanName))
+
+    logger.info("Registering mbean for server " + serverId)
     mbeanServer.registerMBean(
       new IrcServerMXBean {
         def getPort() = ircServerPort
         def getActiveConnectionCount() = server.connectionStats._2
         def getPendingConnectionCount() = server.connectionStats._1
-      }, name)
+      }, mbeanName)
 
     server
+  }
+
+  override def makeChannel(
+    serverId: String,
+    name: ChannelName,
+    memberLookup: (NickName.Normalized) => User.Registered,
+    killMe: (ChannelName) => Unit) = {
+    val mbeanName = jmxName("channel:server=" + serverId + ",name=" + name.name)
+    val channel = super.makeChannel(serverId, name, memberLookup, wrapWithUnregistration(killMe, mbeanName))
+
+    logger.info("Registering mbean for channel " + name)
+    mbeanServer.registerMBean(
+      new IrcChannelMXBean{
+        def getMemberCount() = channel.members.size
+        def getTopic() = channel.topic.getOrElse("<No topic>")
+      }, mbeanName)
+
+    channel
   }
 
 }

@@ -16,7 +16,13 @@ trait ChannelComponent {
       user.reply(ResponseCode.RPL_ENDOFNAMES, Some("*"))
     }
   }
-  
+
+  def makeChannel(
+    serverId: String,
+    name: ChannelName,
+    memberLookup: (NickName.Normalized) => User.Registered,
+    killMe: (ChannelName) => Unit) = new Channel(name, memberLookup, killMe)
+
   class Channel(
     val name: ChannelName,
     memberLookup: (NickName.Normalized) => User.Registered,

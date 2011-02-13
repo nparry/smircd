@@ -103,7 +103,8 @@ trait IrcServerComponent {
       logger.trace("Looking for channel " + name)
       channels.get(name).getOrElse {
         logger.trace("Creating new channel for " + name)
-        val c = new Channel(
+        val c = makeChannel(
+          serverId,
           name,
           { nick => getActiveUser(nick).get },
           { deadName =>
