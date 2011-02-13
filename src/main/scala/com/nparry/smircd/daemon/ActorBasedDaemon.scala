@@ -3,7 +3,7 @@ package com.nparry.smircd.daemon
 import scala.actors._
 import scala.actors.Actor._
 
-object ActorBasedDaemon extends ConnectionComponent
+trait ActorBasedDaemon extends ConnectionComponent
   with IrcServerComponent
   with ChannelComponent
   with UserComponent
@@ -32,7 +32,7 @@ object ActorBasedDaemon extends ConnectionComponent
       }
     })
 
-    val server = new IrcServer(serverId, { () =>
+    val server = makeServer(serverId, { () =>
       pingDriver.shutdownNow()
       pingDriver.awaitTermination(60, TimeUnit.SECONDS)
       exit()

@@ -17,12 +17,12 @@ import org.jboss.netty.handler.codec.string._
 import org.jboss.netty.handler.ssl.SslHandler
 import org.jboss.netty.util.CharsetUtil
 
-import com.nparry.smircd.daemon.ActorBasedDaemon.Daemon
+import com.nparry.smircd.daemon.ActorBasedDaemon
 import com.nparry.smircd.protocol._
 
 import grizzled.slf4j.Logger
 
-class IrcServerPipelineFactory(ircServer: Daemon, channels: ChannelGroup) extends ChannelPipelineFactory {
+class IrcServerPipelineFactory(ircServer: ActorBasedDaemon#Daemon, channels: ChannelGroup) extends ChannelPipelineFactory {
   val logger = Logger(this.getClass())
 
   // TODO - Pass a non-dummy ssl helper as a constructor arg
@@ -159,7 +159,7 @@ class CommandEncoder(emitWebsocketFrames: Boolean) extends OneToOneEncoder {
 }
 
 // Based on http://docs.jboss.org/netty/3.2/xref/org/jboss/netty/example/http/websocket/WebSocketServerHandler.html
-class SmircdHttpHandler(ircServer: Daemon) extends SimpleChannelUpstreamHandler {
+class SmircdHttpHandler(ircServer: ActorBasedDaemon#Daemon) extends SimpleChannelUpstreamHandler {
   val logger = Logger(this.getClass())
 
   override def messageReceived(ctx: ChannelHandlerContext, e: MessageEvent) = {

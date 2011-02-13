@@ -24,6 +24,8 @@ trait IrcServerComponent {
   def pingThresholdMinutes: Int
   def dropThresholdMinutes: Int
 
+  def makeServer(serverId: String, quit: () => Unit): IrcServer = new IrcServer(serverId, quit)
+
   class IrcServer(serverId: String, quit: () => Unit) {
     val logger = Logger(this.getClass())
   

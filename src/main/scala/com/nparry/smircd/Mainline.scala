@@ -3,6 +3,7 @@ package com.nparry.smircd
 import com.nparry.smircd.netty.NettyServer
 import com.nparry.smircd.daemon.ActorBasedDaemon
 import com.nparry.smircd.daemon.IrcServer
+import com.nparry.smircd.jmx.Management
 
 import org.jboss.netty.logging._
 
@@ -93,7 +94,7 @@ class Mainline(port: Int) {
   InternalLoggerFactory.setDefaultFactory(new Slf4JLoggerFactory())
 
   var netty: Option[NettyServer] = None
-  var daemon: Option[ActorBasedDaemon.Daemon] = None
+  var daemon: Option[ActorBasedDaemon#Daemon] = None
 
   def start() = {
     daemon = Some(makeDaemon)
@@ -111,8 +112,12 @@ class Mainline(port: Int) {
     netty = None
   }
 
+  object DaemonFactory extends ActorBasedDaemon with Management {
+    val ircServerPort = port;
+  }
+
   def makeDaemon = {
-    ActorBasedDaemon("smircd")
+    DaemonFactory("smircd")
   }
 
   def makeNetty = {
