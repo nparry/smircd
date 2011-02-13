@@ -3,6 +3,8 @@ SmIRCd - Scalarific minimal IRC daemon
 
 A basic low-feature IRC daemon written in [Scala](http://www.scala-lang.org/) and built via [SBT](http://code.google.com/p/simple-build-tool/).
 
+You can use any IRC client to connect to SmIRCd. SmIRCd also bundles a basic browser hosted IRC client.
+
 What it does
 --------------------------------------
 
@@ -40,8 +42,8 @@ Build it!
 
 This creates an executable minified uberjar.
 
-    $ ls target/scala_2.8.0/*.min.jar
-    target/scala_2.8.0/smircd_2.8.0-1.0.min.jar
+    $ ls target/scala_2.8.0/*-min.jar
+    target/scala_2.8.0/smircd_2.8.0-1.0-min.jar
 
 SBT handles all the dependencies...
 
@@ -52,7 +54,7 @@ SBT handles all the dependencies...
 Run it!
 --------------------------------------
 
-    $ java -jar target/scala_2.8.0/smircd_2.8.0-1.0.min.jar
+    $ java -jar target/scala_2.8.0/smircd_*-min.jar
 
 This starts SmIRCd listening on port 6667 and blocks until you press Ctrl+C.
 
@@ -62,6 +64,14 @@ Optional command line arguments are:
 
     --port     Listening port, defaults to 6667
     --logLevel Logging verbosity, defaults to INFO
+
+Use it!
+--------------------------------------
+
+Once SmIRCd is running, point your browser to http://localhost:6667 to use the embedded
+browser based IRC client. Or, use your favorite dedicated IRC client - SmIRCd uses the
+same port for IRC traffic and HTTP. Note that the browser client requires
+[Websocket support](http://en.wikipedia.org/wiki/WebSockets#Browsers_supporting_WebSocket).
 
 License
 --------------------------------------

@@ -82,6 +82,7 @@ object Mainline {
 
       // Block until ^C
       synchronized {
+        logger.info("Started on port " + arguments.port)
         wait()
       }
     }
