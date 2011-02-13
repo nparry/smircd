@@ -19,25 +19,27 @@ trait Management extends IrcServerComponent {
   val logger = Logger(this.getClass())
   val ircServerPort: Int;
 
-  class JmxIrcServer(val server: IrcServer) extends IrcServerMXBean {
-    def getPort() = ircServerPort
-    def getActiveConnectionCount() = server.connectionStats._2
-    def getPendingConnectionCount() = server.connectionStats._1
+  def mbeanServer = java.lang.management.ManagementFactory.getPlatformMBeanServer()
+  def jmxName(serverId: String) = new ObjectName("com.nparry.smircd.server:name=" + serverId)
+  def wrapWithUnregistration(f: () => Unit, name: ObjectName) = { () =>
+    logger.info("Unregistering mbean " + name)
+    mbeanServer.unregisterMBean(name)
+    f()
   }
 
-  def mbeanServer = java.lang.management.ManagementFactory.getPlatformMBeanServer()
-  def jmxName(serverId: String) = new ObjectName("com.nparry.smircd.IrcServer:serverId=" + serverId)
-
   override def makeServer(serverId: String, quit: () => Unit) = {
-    val jmxWrapper = new JmxIrcServer(super.makeServer(serverId, { () =>
-      logger.info("Unregistering mbean for " + serverId)
-      mbeanServer.unregisterMBean(jmxName(serverId))
-      quit()
-    }))
+    val name = jmxName(serverId)
+    val server = super.makeServer(serverId, wrapWithUnregistration(quit, name))
 
     logger.info("Registering mbean for " + serverId)
-    mbeanServer.registerMBean(jmxWrapper, jmxName(serverId))
-    jmxWrapper.server
+    mbeanServer.registerMBean(
+      new IrcServerMXBean {
+        def getPort() = ircServerPort
+        def getActiveConnectionCount() = server.connectionStats._2
+        def getPendingConnectionCount() = server.connectionStats._1
+      }, name)
+
+    server
   }
 
 }
