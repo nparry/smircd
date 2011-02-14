@@ -4,6 +4,7 @@ import javax.management._
 
 import com.nparry.smircd.daemon._
 import com.nparry.smircd.protocol._
+import com.nparry.smircd.protocol.Command._
 
 import grizzled.slf4j.Logger
 
@@ -16,6 +17,7 @@ trait IrcServerMXBean {
 trait IrcChannelMXBean {
   def getMemberCount(): Int
   def getTopic(): String
+  def setTopic(t: String): Unit
 }
 
 trait Management extends IrcServerComponent with ChannelComponent {
@@ -69,6 +71,12 @@ trait Management extends IrcServerComponent with ChannelComponent {
       new IrcChannelMXBean{
         def getMemberCount() = channel.members.size
         def getTopic() = channel.topic.getOrElse("<No topic>")
+        def setTopic(t: String) = {
+          logger.info("Changing topic of " + name + " via JMX")
+          channel.memberChangedTopic(
+            internalSystemAdministration,
+            TopicCommand(ParsedCommand(None, "TOPIC", List(name.name, t))))
+        }
       }, mbeanName)
 
     channel

@@ -9,14 +9,22 @@ trait UserComponent {
 
   this: ConnectionComponent with ChannelComponent =>
 
+  val internalSystemAdministration = User.Registered(
+    None,
+    "internalAdmin",
+    NickName("SystemAdministration"),
+    UserCommand(ParsedCommand(None, "USER", List("internalAdmin", "localhost", "localhost", "Internal system administration"))),
+    Map(),
+    None)
+
   object User {
   
     case class Pending(
-      override val connection: Connection,
+      conn: Connection,
       serverId: String,
       password: Option[String] = None,
       override val maybeNickname: Option[NickName] = None
-    ) extends User(connection, serverId, "PendingUser") {
+    ) extends User(Some(conn), serverId, "PendingUser") {
   
       def updatePassword(pw: String) =
         if (isRegistered) Left(ResponseCode.ERR_ALREADYREGISTRED)
@@ -25,7 +33,7 @@ trait UserComponent {
       def updateNickname(cmd: NickCommand) = copy(maybeNickname=Some(cmd.nickname))
   
       // TODO - if we don't have a nick yet?
-      def asRegistered(info: UserCommand) = Registered(connection, serverId, maybeNickname.get, info)
+      def asRegistered(info: UserCommand) = Registered(Some(connection), serverId, maybeNickname.get, info)
   
       def joinChannels(cmd: JoinCommand, channels: List[Channel]) = notRegistered
       def partChannels(cmd: PartCommand) = notRegistered
@@ -38,15 +46,15 @@ trait UserComponent {
       def notRegistered(): User = returnError(ResponseCode.ERR_NOTREGISTERED)
   
     }
-  
+
     case class Registered(
-      override val connection: Connection,
+      conn: Option[Connection],
       serverId: String,
       nickname: NickName,
       info: UserCommand,
       channels: Map[ChannelName, Channel] = Map[ChannelName, Channel](),
       awayMessage: Option[String] = None
-    ) extends User(connection, serverId, "RegisteredUser") {
+    ) extends User(conn, serverId, "RegisteredUser") {
   
       def maybeNickname = Some(nickname)
       def updatePassword(pw: String) = Left(ResponseCode.ERR_ALREADYREGISTRED)
@@ -161,8 +169,10 @@ trait UserComponent {
   
   }
   
-  abstract sealed class User(val connection: Connection, serverId: String, debugName: String) {
+  abstract sealed class User(conn: Option[Connection], serverId: String, debugName: String) {
     val logger = Logger(this.getClass())
+
+    def connection: Connection = conn.get
   
     def maybeNickname: Option[NickName];
     def isRegistered: Boolean = maybeNickname.isDefined
