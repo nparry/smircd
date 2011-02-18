@@ -1,6 +1,8 @@
 import sbt._
 
-class SmircdProject(info: ProjectInfo) extends DefaultProject(info) with ProguardProject {
+class SmircdProject(info: ProjectInfo) extends DefaultProject(info)
+                                       with maven.MavenDependencies
+                                       with ProguardProject {
 
   val jbossRepo = "JBoss Release Repository" at "http://repository.jboss.org/nexus/content/groups/public/"
 
