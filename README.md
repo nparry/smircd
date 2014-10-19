@@ -1,4 +1,4 @@
-SmIRCd - Scalarific minimal IRC daemon
+SmIRCd - Scalarific minimal IRC daemon [![Build Status](https://travis-ci.org/nparry/smircd.svg)](https://travis-ci.org/nparry/smircd)
 ======================================
 
 A basic low-feature IRC daemon written in [Scala](http://www.scala-lang.org/).
