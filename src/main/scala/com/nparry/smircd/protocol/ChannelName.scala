@@ -39,7 +39,8 @@ object ChannelName {
   }
 }
 
-case class ChannelName(name: String) {
+case class ChannelName(name: String) extends Ordered[ChannelName] {
   if (!ChannelName.isValidChannelName(name)) throw new IllegalArgumentException(name)
+  def compare(that: ChannelName) =  name.compare(that.name)
 }
 

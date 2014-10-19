@@ -1,6 +1,6 @@
 package com.nparry.smircd.protocol
 
-import org.specs.Specification
+import org.specs2.mutable._
 import Command._
 
 class CommandSpec extends Specification {

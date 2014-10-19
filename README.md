@@ -1,7 +1,7 @@
 SmIRCd - Scalarific minimal IRC daemon
 ======================================
 
-A basic low-feature IRC daemon written in [Scala](http://www.scala-lang.org/) and built via [SBT](http://code.google.com/p/simple-build-tool/).
+A basic low-feature IRC daemon written in [Scala](http://www.scala-lang.org/).
 
 You can use any IRC client to connect to SmIRCd. SmIRCd also bundles a basic browser hosted IRC client.
 
@@ -38,23 +38,17 @@ In addition to the commands absent from the above list, notable missing features
 Build it!
 --------------------------------------
 
-    $ sbt proguard
+    $ sbt assembly
 
-This creates an executable minified uberjar.
+This creates an executable uberjar.
 
-    $ ls target/scala_2.8.0/*-min.jar
-    target/scala_2.8.0/smircd_2.8.0-1.0-min.jar
-
-SBT handles all the dependencies...
-
-* [Netty](http://www.jboss.org/netty)
-* [SLF4J and Logback](http://logback.qos.ch/)
-* [Grizzled (SLF4J Scala wrapper)](http://bmc.github.com/grizzled-slf4j/)
+    $ ls target/scala-*/*-assembly-*.jar
+    target/scala-2.11/smircd-assembly-1.0-SNAPSHOT.jar
 
 Run it!
 --------------------------------------
 
-    $ java -jar target/scala_2.8.0/smircd_*-min.jar
+    $ java -jar target/scala-2.11/smircd-assembly-1.0-SNAPSHOT.jar
 
 This starts SmIRCd listening on port 6667 and blocks until you press Ctrl+C.
 

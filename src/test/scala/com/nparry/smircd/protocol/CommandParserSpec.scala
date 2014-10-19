@@ -1,6 +1,6 @@
 package com.nparry.smircd.protocol
 
-import org.specs.Specification
+import org.specs2.mutable._
 
 class CommandParserSpec extends Specification {
 
@@ -27,13 +27,13 @@ class CommandParserSpec extends Specification {
     }
 
     "rejectParsingEmptyInput" in {
-      badParse("") must include("Empty")
+      badParse("") must contain("Empty")
     }
 
     "rejectParsingBogusInput" in {
-      badParse("    ") must include("Unable")
-      badParse(" QUIT") must include("Unable")
-      badParse(" :Foo QUIT") must include("Unable")
+      badParse("    ") must contain("Unable")
+      badParse(" QUIT") must contain("Unable")
+      badParse(" :Foo QUIT") must contain("Unable")
     }
 
     "handleEmptyPrefix" in {
@@ -48,12 +48,12 @@ class CommandParserSpec extends Specification {
     }
 
     "rejectPrefixOnlyInput" in {
-      badParse(":Boom") must include("Boom")
+      badParse(":Boom") must contain("Boom")
     }
 
     "rejectInvalidPrefix" in {
-      badParse(":") must include("Invalid prefix")
-      badParse(": QUIT") must include("Invalid prefix")
+      badParse(":") must contain("Invalid prefix")
+      badParse(": QUIT") must contain("Invalid prefix")
     }
 
     "extractValidCommand" in {
@@ -66,25 +66,25 @@ class CommandParserSpec extends Specification {
     }
 
     "rejectInvalidCommand" in {
-      badParse("PASS123") must include("Invalid command")
-      badParse(":Wiz PASS123") must include("Invalid command")
-      badParse("PASS123 pw") must include("Invalid command")
-      badParse(":Wiz PASS123 pw") must include("Invalid command")
+      badParse("PASS123") must contain("Invalid command")
+      badParse(":Wiz PASS123") must contain("Invalid command")
+      badParse("PASS123 pw") must contain("Invalid command")
+      badParse(":Wiz PASS123 pw") must contain("Invalid command")
 
-      badParse("01A") must include("Invalid command")
-      badParse(":Wiz 01A") must include("Invalid command")
-      badParse("01A pw") must include("Invalid command")
-      badParse(":Wiz 01A pw") must include("Invalid command")
+      badParse("01A") must contain("Invalid command")
+      badParse(":Wiz 01A") must contain("Invalid command")
+      badParse("01A pw") must contain("Invalid command")
+      badParse(":Wiz 01A pw") must contain("Invalid command")
 
-      badParse("12") must include("Invalid command")
-      badParse(":Wiz 12") must include("Invalid command")
-      badParse("12 blah") must include("Invalid command")
-      badParse(":Wiz 12 blah") must include("Invalid command")
+      badParse("12") must contain("Invalid command")
+      badParse(":Wiz 12") must contain("Invalid command")
+      badParse("12 blah") must contain("Invalid command")
+      badParse(":Wiz 12 blah") must contain("Invalid command")
 
-      badParse("1234") must include("Invalid command")
-      badParse(":Wiz 1234") must include("Invalid command")
-      badParse("1234 blah") must include("Invalid command")
-      badParse(":Wiz 1234 blah") must include("Invalid command")
+      badParse("1234") must contain("Invalid command")
+      badParse(":Wiz 1234") must contain("Invalid command")
+      badParse("1234 blah") must contain("Invalid command")
+      badParse(":Wiz 1234 blah") must contain("Invalid command")
     }
 
     "handleEmptyParams" in {

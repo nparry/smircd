@@ -26,13 +26,15 @@ trait ChannelComponent {
   class Channel(
     val name: ChannelName,
     memberLookup: (NickName.Normalized) => User.Registered,
-    killMe: (ChannelName) => Unit) {
+    killMe: (ChannelName) => Unit) extends Ordered[Channel] {
   
     val logger = Logger(this.getClass())
   
     val members: MSet[NickName.Normalized] = MSet()
     var topic: Option[String] = None
   
+    def compare(that: Channel) =  name.compare(that.name)
+
     def newMember(user: User.Registered, cmd: JoinCommand) = {
       members.add(user.nickname.normalized)    
       logger.debug(user + " joined " + this) 

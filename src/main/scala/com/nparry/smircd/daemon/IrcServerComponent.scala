@@ -117,10 +117,12 @@ trait IrcServerComponent {
     }
   
     def getDesiredChannels(names: List[ChannelName]): Iterable[Channel] = {
-     if (names.isEmpty)
-       channels.values
-     else
-       channels.filterKeys(names.contains(_)).values
+     val values =
+       if (names.isEmpty)
+         channels.values
+       else
+         channels.filterKeys(names.contains(_)).values
+     values.toSeq.sorted
     }
     
     def processIncomingMsg(msg: Any) {

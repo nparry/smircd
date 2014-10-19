@@ -1,6 +1,6 @@
 package com.nparry.smircd.protocol
 
-import org.specs.Specification
+import org.specs2.mutable._
 
 class ParsedCommandSpec extends Specification {
 
